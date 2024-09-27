@@ -1,5 +1,5 @@
-import events
-from rsi import *
+import Utils.events as events
+from Modules.rsi import *
 allsprites={}
 
 class Sprite:

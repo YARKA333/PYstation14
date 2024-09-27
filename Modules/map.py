@@ -1,4 +1,4 @@
-from rsi import *
+from Modules.rsi import *
 import pickle
 
 alpha=[chr(i) for i in list(range(65,91))+list(range(97,123))]

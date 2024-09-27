@@ -1,5 +1,5 @@
-import events
-import shared
+import Utils.events as events
+import Utils.shared as shared
 grid=shared.get("globalgrid")
 
 class CableVisuals:

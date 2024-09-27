@@ -6,25 +6,21 @@ import math
 import pickle
 from tqdm import tqdm
 
-import shared
-from multidict import Multidict
+import Utils.events as events
+import Utils.parents as parents
+import Utils.shared as shared
+from Utils.multidict import Multidict
+
 sharedgrid=Multidict()
 shared.set("globalgrid",sharedgrid)
 
-import entityModule
-from rsi import *
-from decimal import Decimal
-from parallax import Parallax
+import Modules.entityModule as entityModule
+import Modules.map as map
+from Modules.rsi import *
+from Modules.parallax import Parallax
+from Modules.entityModule import Entity
 import hashlib as sha
 import cProfile
-import map
-import events
-
-import parents
-from entityModule import Entity
-
-
-
 
 
 def optc(c,d):return math.floor((c+d/64)/16)

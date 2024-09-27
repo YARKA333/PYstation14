@@ -1,6 +1,6 @@
 import ruamel.yaml
 
-from rsi import *
+from Modules.rsi import *
 import pickle
 
 chains=[]

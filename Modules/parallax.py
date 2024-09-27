@@ -2,7 +2,7 @@ import random
 import pygame as pg
 import random
 import math
-from rsi import *
+from Modules.rsi import *
 import tomllib
 import noise
 from tqdm import tqdm

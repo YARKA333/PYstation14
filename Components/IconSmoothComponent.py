@@ -1,10 +1,10 @@
 import pickle
-from rsi import *
+from Modules.rsi import *
 import math
 import pygame as pg
-import events
-import shared
-import entityModule
+import Utils.events as events
+import Utils.shared as shared
+import Modules.entityModule as entityModule
 grid=shared.get("globalgrid")
 
 

@@ -1,5 +1,6 @@
-import events
-import shared
+import Utils.events as events
+import Utils.shared as shared
+from Modules.rsi import *
 
 class Transform:
   def __init__(self,entity,component):

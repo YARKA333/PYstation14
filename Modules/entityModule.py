@@ -1,6 +1,6 @@
-import shared
-import parents
-import component
+import Utils.shared as shared
+import Utils.parents as parents
+import Components.component as component
 wanted_comps={}
 
 class Entity:
