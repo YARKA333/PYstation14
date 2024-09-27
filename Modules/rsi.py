@@ -1,0 +1,300 @@
+print("rsi loading")
+import io
+import os.path
+import numba
+#import yaml
+import math
+from tqdm import tqdm
+import time
+import pygame as pg
+import json
+import random
+import pickle
+import ruamel
+from ruamel import yaml
+from pathlib import Path
+from zipfile import ZipFile
+#from threading import Thread
+ss14_folder="C:/Servers/SS14 c2"
+yaml=ruamel.yaml.YAML(typ='rt')
+allr={}
+
+class _State:
+  def __init__(self,path,state,source=None):
+    self.image=pg.image.load(openfile(joinpath(path,state["name"]+".png"),source)).convert_alpha()
+
+    self.image_x,self.image_y=self.image.get_size()
+    if "directions" in state:
+      self.directions=state["directions"]
+    else:self.directions=1
+    if "delays" in state:
+      self.delays=state["delays"]
+    else: self.delays=None
+  def getframe(self,dir=0):
+    dir=dir%self.directions
+    if self.delays==None: return dir
+    delay=self.delays[dir]
+    secs=time.time()%sum(delay)
+    summ=0
+    for i in range(len(delay)):
+      summ+=delay[i]
+      if secs<summ:
+        return i+len(delay)*dir
+  def getframes(self,dir=0):
+    if self.delays==None:return 1
+    return len(self.delays[dir])
+
+def sin(a):return math.sin(math.radians(a))
+def cos(a):return math.cos(math.radians(a))
+
+class RSI:
+  def __init__(self,path:Path,source=None):
+    if not "Textures" in path:
+      path=joinpath("Textures",path)
+    f=openfile(joinpath(path,"meta.json"),source)
+    meta=json.load(f)
+    f.close()
+    self.path=path
+    self.frame_x=meta["size"]["x"]
+    self.frame_y=meta["size"]["y"]
+    self.default=meta["states"][0]["name"]
+    self.states={}
+    for state in meta["states"]:
+      self.states.update({state["name"]:_State(path,state,source)})
+  def __call__(self,size:float|int=1,state:str|None=None,dir:int=0,frame:int|None=None)->pg.Surface:
+    if state==None: state=self.states[self.default]
+    else:
+      state=str(state)
+      if state in self.states.keys():
+          state=self.states[state]
+      else:
+        print(f"Tried to get state \"{state}\" of object \"{self.path}")
+        state=self.states[self.default]
+    surf=pg.Surface([self.frame_x,self.frame_y],flags=pg.SRCALPHA)
+    if frame==None:
+      frame=state.getframe(dir)
+    row=state.image_x/self.frame_x
+    x=frame%row*self.frame_x
+    y=frame//row*self.frame_y
+    surf.blit(state.image,[-x,-y])
+    return pg.transform.scale_by(surf,size)
+  def getstateframes(self,state:str=None,dir:int=0)->int:
+    if state==None:state=self.states[self.default]
+    else:state=self.states[state]
+    return state.getframes(dir)
+  def getstates(self)->list:return self.states.keys()
+
+def hextorgb(hex:str)->list:
+  """Converts hex color string to rgb(a) format
+  \n For example:
+  \n   '#FF2AB5EC' -> [255,42,181,236]"""
+
+  hex2=hex.replace("#","")
+  return [int(hex2[i*2:i*2+2],16) for i in range(len(hex2)//2)]
+
+def yml(path,raw=False):
+  try:
+    if raw:
+      with open(path,"rb") as file:
+        return yaml.load(file)
+    else:
+      return yaml.load(openfile(path))
+  except Exception as error:print(f'{error} \nError when opening {path} in {raw and "raw" or "auto"} mode')
+
+class Floor:
+  def __init__(self,id:str="Space",source:os.PathLike="default"):
+    #for item in mig:
+    #  if item["id"]==id:
+    #    id=item["target"]
+    #    break
+    #tile=next((item for item in tiles if item["id"]==id),None)
+    try:
+      id=mig[id]["target"]
+    except:pass
+    try:
+      tile=tiles[id]
+    except:
+      print("No tile with id:"+id+"\nReplaced with Space")
+      #tile=next((item for item in tiles if item["id"]=="Space"),None)
+      tile=tiles["Space"]
+    for k,v in tile.items():
+      setattr(self,k,v)
+    if hasattr(self,"sprite"):
+      self.image=pg.image.load(openfile(self.sprite))
+      surf=pg.Surface([32]*2,pg.SRCALPHA)
+      self.images=[]
+      if not hasattr(self,"variants"):
+        self.variants=1
+        self.placementVariants=[1]
+      for i in range(self.variants):
+        surf.blit(self.image,[-32*i,0])
+        self.images.append(surf.copy())
+    else:self.sprite=False
+
+  def __call__(self,variant=None):
+    if self.sprite:
+      if variant==None:
+        return random.choices(self.images,weights=self.placementVariants)[0]
+      else:
+        assert variant<self.variants
+        return self.images[variant]
+    else: return False
+
+class Decal:
+  def __init__(self,data):
+    node=data["node"]
+    id=node["id"]
+    spritedata=decal_protos[id]["sprite"]
+    rsi=spritedata["sprite"]
+    if not rsi in decal_rsi.keys():
+      decal_rsi.update({rsi:RSI(rsi)})
+    try:ang=angle(node["angle"])
+    except:ang=0
+    color=[int(node["color"][i*2+1:i*2+3],16) for i in range(4)]
+    self.sprite=pg.transform.rotate(decal_rsi[rsi](state=spritedata["state"]),ang)
+    self.sprite.fill(color[:3],special_flags=pg.BLEND_RGB_MULT)
+    self.sprite.convert_alpha()
+    self.sprite.set_alpha(color[3])
+    self.instances=dict([(c,[float(b) for b in a.split(",")]) for c,a in data["decals"].items()])
+
+  def render(self):
+    global disp
+    for ins in self.instances.values():
+      if abs((ins[0]*32-px)*2)-32<WIDTH and abs((py-ins[1]*32)*2)-32<HEIGHT:
+        disp.blit(self.sprite,[ins[0]*32-px+WIDTH/2,-ins[1]*32+py+HEIGHT/2])
+  def prebake(self,chunks,cmap):
+    for ins in self.instances.values():
+      cpos=[ins[i]//16 for i in [0,1]]
+      dpos=[ins[0]%16*32,(15-ins[1]%16)*32]
+      chunks[cmap.index(cpos)].blit(self.sprite,dpos)
+
+def openfile(path,source=None):
+  if not source:source=ss14_folder
+  assert os.path.isdir(source)
+  #try:
+  jpath=Path(joinpath(source,"Resources",path))
+  return io.BytesIO(jpath.read_bytes())
+  #except:pass
+  #try:
+  #  with ZipFile(joinpath(source,"Content.Client.zip")) as archive:
+  #    return io.BytesIO(archive.read(joinpath(path)))
+  #except:raise Exception("incorrect path: "+path)
+
+def listdir(path,source=None):
+  if not source: source=ss14_folder
+  assert os.path.isdir(source)
+  try:
+    return os.listdir(joinpath(source,"Resources",path))
+  except:pass
+  try:
+    with ZipFile(joinpath(source,"Content.Client.zip")) as archive:
+       return[f.split("/")[-1] for f in archive.namelist() if f.startswith(path)]
+  except:raise Exception("incorrect path: "+path)
+
+#@numba.njit(cache=1)
+def namelist(path,source=None):
+  if source=="Project": fpath=path
+  else:
+    if not source: source=ss14_folder
+    fpath=joinpath(source,"Resources",path)
+  #try:
+  e=[]
+  for a,b,c in os.walk(fpath):
+    a=a.replace(fpath,"")
+    for d in c:
+      try:
+        e.append(joinpath(a,d))
+      except IndexError:print(f'a:{a},d:{d}')
+  return e
+  #except:pass
+  #try:
+  #  with ZipFile(joinpath(source,"Content.Client.zip")) as archive:
+  #    return[f.split("/")[-1] for f in archive.namelist() if f.startswith(path)]
+  #except:raise Exception("incorrect path: "+path)
+
+@numba.njit(cache=1)
+def joinpath(*paths:str):
+  result=""
+  for path in paths:
+    if path=="":continue
+    path=path.replace("\\","/")
+    if path[0]=="/":
+      path=path[1:]
+    if path[-1]=="/":
+      path=path[0:-1]
+    if result:result+="/"
+    result+=path
+  return result
+
+def loadrsi(name):
+  result=dict.get(allr,name)
+  if not result:
+    result=RSI(name)
+    allr.update({name:result})
+  return result
+
+def findict(dicts,key,value=None,maxdepth=0):
+  if type(dicts)==ruamel.yaml.CommentedMap and key in dicts and (value==None or dicts[key]==value):
+      return dicts
+  if maxdepth!=0:
+    if type(dicts)==ruamel.yaml.CommentedMap:
+      for a,b in dicts.items():
+        #print((" "*-maxdepth)+str(a)+":")
+        r=findict(b,key,value,maxdepth-1)
+        if r!=False:return r
+    elif type(dicts)==ruamel.yaml.CommentedSeq:
+      for a in dicts:
+        r=findict(a,key,value,maxdepth-1)
+        if r!=False:return r
+    #else: print((" "*-maxdepth)+str(dicts))
+  return False
+
+def angle(raw:str):
+  return round(float(raw.split(" ")[0])/math.pi*180)
+
+def findproto_yml(id:str,type=None):
+  names=namelist("opti_proto","Project")
+  search=f"{id.upper()[0]}.yml"
+  if type:
+    search=joinpath(type,search)
+  for file in [joinpath("opti_proto",name) for name in names if name.endswith(search)]:
+    protos=yml(file,True)
+    return findproto(id,protos)
+
+def strtuple(cor:str)->tuple:
+  return [int(a) for a in cor.split(",")]
+
+def findproto(id,list:list):
+  for proto in list:
+    try:
+      if proto["id"]==id:
+        return proto
+    except:
+      print(f"dolbany shashlik:\n{proto}")
+
+def gettypeyml(type):
+  try:
+    dir=joinpath("opti_proto",type)
+    files=os.listdir(joinpath("opti_proto",type))
+    protos=[]
+    for file in files:
+      protos+=yml(joinpath(dir,file),True)
+    return dict([(proto["id"],proto) for proto in protos])
+  except FileNotFoundError:print("gettypeyml is currently unaviable")
+
+print("loading yaml")
+with open("kake/prototypes.pk","rb") as file:
+  allprotos=pickle.load(file)
+allp=allprotos["entity"]
+mig=allprotos["tileAlias"]
+tiles=allprotos["tile"]
+decal_protos=allprotos["decal"]
+decal_rsi={}
+print("loaded yaml")
+
+def vec(a):
+  return [max(-1,min(1,abs(4-(a+i)%8)-2)) for i in [-2,0]]
+def svec(a,l=1):
+  return [l*sin(a),l*cos(a)]
+
+
