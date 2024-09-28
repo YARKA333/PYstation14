@@ -1,17 +1,21 @@
 import Utils.events as events
 import Utils.shared as shared
+from Modules.rsi import *
+import Modules.entityModule as entityModule
 grid=shared.get("globalgrid")
 
-class CableVisuals:
+class CableVisualizer:
   def __init__(self,entity,args):
+    self.uid=entity.uid
     self.dstate=dict.get(args,"statePrefix")
     events.followcomp("Transform",self.OnTransform,entity)
+    events.subscribe("start",self.startup)
   def OnTransform(self,args):
     self.trans=args
-    self.scan()
-
-  def scan(self):
-    self.nbrs=[]
+    self.calcsprites()
+  def startup(self,args):self.calcsprites()
+  def calcsprites(self):
+    mask=0
     for i in range(4):
       dif=vec([0,4,2,6][i])
       pos=[dif[e]+self.trans.pos[e] for e in [0,1]]
@@ -19,10 +23,10 @@ class CableVisuals:
       for uid in uids:
         entity=entityModule.find(uid)
         if not entity: continue
-        comp=entity.comp("CableVisuals")
+        comp=entity.comp("CableVisualizer")
         if not comp: continue
-        if comp.ctype!=self.ctype: continue
-        self.nbrs.append(1)
+        if comp.dstate!=self.dstate: continue
+        mask+=2**i
         break
-      else:
-        self.nbrs.append(0)
+    print(f'scanned wire on {self.trans.pos} with result {mask}')
+    events.call("setspritelayer",{"state":f'{self.dstate}{mask}'},self.uid)

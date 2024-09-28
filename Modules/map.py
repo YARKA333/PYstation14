@@ -20,6 +20,7 @@ def loadmap(id):
     else:
       print("cache not found\nProcessing map...")
       map_file=yml(mapPath)
+      ensuredir(kakePath)
       with open(kakePath,"xb") as file:
         pickle.dump(map_file,file)
     print("loaded map")

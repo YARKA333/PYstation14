@@ -68,7 +68,8 @@ class RSI:
       if state in self.states.keys():
           state=self.states[state]
       else:
-        print(f"Tried to get state \"{state}\" of object \"{self.path}")
+        if self.path!="Textures/deprecated.rsi":
+          print(f"Tried to get state \"{state}\" of object \"{self.path}\"")
         state=self.states[self.default]
     surf=pg.Surface([self.frame_x,self.frame_y],flags=pg.SRCALPHA)
     if frame==None:
@@ -83,6 +84,17 @@ class RSI:
     else:state=self.states[state]
     return state.getframes(dir)
   def getstates(self)->list:return self.states.keys()
+  def getdirs(self,state=None):
+    if state==None: state=self.states[self.default]
+    else:
+      state=str(state)
+      if state in self.states.keys():
+          state=self.states[state]
+      else:
+        if self.path!="Textures/deprecated.rsi":
+          print(f"Tried to get state \"{state}\" of object \"{self.path}\"")
+        state=self.states[self.default]
+    return state.directions
 
 def hextorgb(hex:str)->list:
   """Converts hex color string to rgb(a) format
@@ -296,5 +308,13 @@ def vec(a):
   return [max(-1,min(1,abs(4-(a+i)%8)-2)) for i in [-2,0]]
 def svec(a,l=1):
   return [l*sin(a),l*cos(a)]
+
+def ensuredir(path):
+  dirs=path.split("/")[:-1]
+  cpath=""
+  for i in range(len(dirs)):
+    cpath="/".join(dirs[:i+1])
+    if os.path.isdir(cpath): continue
+    os.mkdir(cpath)
 
 

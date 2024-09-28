@@ -26,8 +26,8 @@ def call(name,args=None,entity=None):
     ret=func(args)
     if ret!=None:
       returns.append(ret)
-  if not name in ["scanpos","render"]:
-    print(f'called {name} in {entity} with {args} and {returns}')
+  #if not name in ["scanpos","render"]:
+  #  print(f'called {name} in {entity} with {args} and {returns}')
   return returns
 
 def followcomp(name,func,entity):

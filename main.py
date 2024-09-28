@@ -54,7 +54,9 @@ for entitype in tqdm(map_file["entities"],desc="loading entities"):
     entities.append(Entity(entity["uid"],components=basecomps+entity["components"]))
     uids.append(entity["uid"])
     if len(entities)!=len(uids):raise BaseException(f"uids:{len(uids)} ents:{len(entites)}")
+print("pinging...")
 events.call("pingpos")
+events.call("start")
 print(topdict(entityModule.wanted_comps))
 
 try:
@@ -72,6 +74,10 @@ map_decals=findict(map_file["entities"],
   "type","DecalGrid",5)["chunkCollection"]["nodes"]
 drawdepths=[
   "LowFloors",
+  "ThickPipe",
+  "ThickWire",
+  "WhinPipe",
+  "ThinWire",
   "BelowFloor",
   "FloorTiles",
   "FloorObjects",

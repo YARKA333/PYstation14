@@ -98,8 +98,10 @@ class IconSmooth:
             -16
             +dst_wh[0]/2
             +self.pos[0]*32,
-            (-pos[1]-dst_wh[1]
+            (-pos[1]
+             -dst_wh[1]
              -16
              +dst_wh[1]/2
              +self.pos[1]*32)*-1]
-      dst.blit(self.sprite,dpos)
+      if -16<dpos[0]<1936 and -16<dpos[1]<1096:
+        dst.blit(self.sprite,dpos)
