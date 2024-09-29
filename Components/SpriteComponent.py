@@ -1,7 +1,7 @@
 import Utils.events as events
 from Modules.rsi import *
+from colors import colors
 allsprites={}
-rotsprites={}
 
 class Sprite:
   def __init__(self,entity,component):
@@ -12,9 +12,12 @@ class Sprite:
     self.uid=entity.uid
     self.pos=entity.pos
     self.rot=entity.rot
-    #print(f'{entity.uid} called Sprite with {component}')
     self.icon=dict.get(component,"sprite")
     if self.icon:
+      self.color=dict.get(
+        colors,
+        dict.get(component,"color","White"),
+        (255,255,255,255))
       events.subscribe("setspritelayer",self.setlayer,entity.uid)
       self.rsi=loadrsi(self.icon)
       self.states=dict.get(component,"layers")
@@ -31,20 +34,22 @@ class Sprite:
     for layer in self.states:
       state=dict.get(layer,"state")
       if not state: continue
-      name=f'{state}:{self.rot}'
-      if name in rotsprites.keys():
-        self.rotlayers.append(rotsprites[name])
+      name=self.composename(self.icon,layer,self.color,self.rot)
+      if name in allsprites.keys():
+        self.rotlayers.append(allsprites[name])
       else:
         image=self.rsi(state=state)
+        if self.color[0:4]!=(255,255,255):
+          image.fill(self.color,special_flags=pg.BLEND_RGB_MULT)
         rimage=pg.transform.rotate(image,self.rot)
-        rotsprites.update({name:rimage})
+        allsprites.update({name:rimage})
         self.rotlayers.append(rimage)
   def move(self,comp):
     self.pos=comp.pos
     self.rot=comp.rot
     self.calcsprites()
-  def composename(self,path,state,color):
-    return f'{path}:{state}:{color}'
+  def composename(self,*args):
+    return ":".join([str(a) for a in args])
   def setlayer(self,args):
     index=dict.get(args,"index",0)
     name=args["state"]

@@ -28,5 +28,4 @@ class CableVisualizer:
         if comp.dstate!=self.dstate: continue
         mask+=2**i
         break
-    print(f'scanned wire on {self.trans.pos} with result {mask}')
     events.call("setspritelayer",{"state":f'{self.dstate}{mask}'},self.uid)

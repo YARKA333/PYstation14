@@ -42,7 +42,7 @@ def parent(id:str)->list:
       result=part.copy()
       result.update(compt)
       for confl in confls:
-        temp=part[confl]
+        temp=part[confl].copy()
         temp.update(compt[confl])
         result.update({confl:temp})
       if not compt:
