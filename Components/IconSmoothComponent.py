@@ -11,7 +11,6 @@ grid=shared.get("globalgrid")
 
 class IconSmooth:
   def __init__(self,entity,args):
-
     self.pos=[0,0]
     self.rpos=1
     self.uid=entity.uid
@@ -19,12 +18,13 @@ class IconSmooth:
     self.mode=dict.get(args,"mode","Corners")
     #events.subscribe("scanpos",self.OnScan)
     if self.mode=="Corners":
-      self.depth="Overlays"
+      self.cpos=[-0.5,-0.5]
+      self.depth="Objects"
       self.rsi=loadrsi("deprecated.rsi")
       self.dstate=dict.get(args,"base")
       self.calcsprite()
       events.followcomp("Sprite",self.OnSprite,entity)
-      events.subscribe("render",self.OnRender)
+      #events.subscribe(f"render:{self.depth}:{self.cpos}",self.OnRender)
       events.subscribe("pingpos",self.OnPing)
     events.followcomp("Transform",self.OnTransform,entity)
 
@@ -56,10 +56,15 @@ class IconSmooth:
     #print(f'scanned {self.pos} with results {self.nbrs}')
 
 
-  def OnTransform(self,args):
+  def OnTransform(self,comp):
     #events.call("pingpos",{"pos":self.pos,"ctype":self.ctype,"uid":self.uid})
-    self.pos=args.pos
+    self.pos=comp.pos
     if self.mode=="Corners":
+      cpos=[int(self.pos[i]//16) for i in [0,1]]
+      if cpos!=self.cpos:
+        #events.unsubscribe(f"render:{self.depth}:{self.cpos}",self.OnRender)
+        self.cpos=cpos
+        #events.subscribe(f"render:{self.depth}:{self.cpos}",self.OnRender)
       self.calcsprite()
     self.rpos=0
   def OnSprite(self,args):
@@ -75,12 +80,13 @@ class IconSmooth:
     self.scan()
     self.sprite=pg.Surface([32,32],pg.SRCALPHA)
     for i in range(0,8,2):
-       self.sprite.blit(self.rsi(1,
-         f"{self.dstate}{
+      state=f"{self.dstate}{
          self.nbrs[i%8]*4+
          self.nbrs[(i+1)%8]*2+
-         self.nbrs[(i+2)%8]}",
-         [0,2,1,3][i//2]),[0,0])
+         self.nbrs[(i+2)%8]}"
+      events.call("setspritelayer",{"index":int(i/2),"state":state,"dir":i//2},self.uid)
+      #self.sprite.blit(self.rsi(1,state,
+      #   [0,2,1,3][i//2]),[0,0])
   def OnPing(self,args):
     #if dict.get(args,"uid")==self.uid:return
     #if dict.get(args,"ctype")!=self.ctype:return
@@ -89,19 +95,17 @@ class IconSmooth:
     self.calcsprite()
 
   def OnRender(self,args):
-    depth=dict.get(args,"depth")
-    if depth==self.depth:
-      dst:pg.Surface=args["dst"]
-      pos:tuple=args["pos"]
-      dst_wh:tuple=dst.get_size()
-      dpos=[-pos[0]
-            -16
-            +dst_wh[0]/2
-            +self.pos[0]*32,
-            (-pos[1]
-             -dst_wh[1]
-             -16
-             +dst_wh[1]/2
-             +self.pos[1]*32)*-1]
-      if -16<dpos[0]<1936 and -16<dpos[1]<1096:
-        dst.blit(self.sprite,dpos)
+    dst:pg.Surface=args["dst"]
+    pos:tuple=args["pos"]
+    dst_wh:tuple=dst.get_size()
+    dpos=[-pos[0]
+          -16
+          +dst_wh[0]/2
+          +self.pos[0]*32,
+         (-pos[1]
+          -dst_wh[1]
+          -16
+          +dst_wh[1]/2
+          +self.pos[1]*32)*-1]
+    if -32<dpos[0]<960 and -32<dpos[1]<540:
+      dst.blit(self.sprite,dpos)

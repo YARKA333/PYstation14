@@ -6,19 +6,21 @@ grid=shared.get("globalgrid")
 
 class CableVisualizer:
   def __init__(self,entity,args):
+    #self.entity=entity
     self.uid=entity.uid
     self.dstate=dict.get(args,"statePrefix")
     events.followcomp("Transform",self.OnTransform,entity)
     events.subscribe("start",self.startup)
   def OnTransform(self,args):
-    self.trans=args
-    self.calcsprites()
+    self.pos=args.pos
+    #self.calcsprites()
   def startup(self,args):self.calcsprites()
   def calcsprites(self):
+    #self.entity.comp("Sprite")
     mask=0
     for i in range(4):
       dif=vec([0,4,2,6][i])
-      pos=[dif[e]+self.trans.pos[e] for e in [0,1]]
+      pos=[dif[e]+self.pos[e] for e in [0,1]]
       uids=grid.get(str(pos))
       for uid in uids:
         entity=entityModule.find(uid)

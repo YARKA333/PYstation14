@@ -30,16 +30,17 @@ class _State:
     if "delays" in state:
       self.delays=state["delays"]
     else: self.delays=None
-  def getframe(self,dir=0):
-    dir=dir%self.directions
-    if self.delays==None: return dir
-    delay=self.delays[dir]
-    secs=time.time()%sum(delay)
-    summ=0
-    for i in range(len(delay)):
-      summ+=delay[i]
-      if secs<summ:
-        return i+len(delay)*dir
+  def getframe(self,dir=0,frame:int=None,otime:float=0)->int:
+    if frame==None:
+      if self.delays==None: return dir
+      delay=self.delays[dir]
+      secs=(time.time()-otime)%sum(delay)
+      summ=0
+      for frame in range(len(delay)):
+        summ+=delay[frame]
+        if secs<summ:
+          break
+    return frame+len(delay)*dir
   def getframes(self,dir=0):
     if self.delays==None:return 1
     return len(self.delays[dir])
@@ -61,38 +62,47 @@ class RSI:
     self.states={}
     for state in meta["states"]:
       self.states.update({state["name"]:_State(path,state,source)})
-  def __call__(self,size:float|int=1,state:str|None=None,dir:int=0,frame:int|None=None)->pg.Surface:
-    if state==None: state=self.states[self.default]
-    else:
-      state=str(state)
-      if state in self.states.keys():
-          state=self.states[state]
-      else:
-        if self.path!="Textures/deprecated.rsi":
-          print(f"Tried to get state \"{state}\" of object \"{self.path}\"")
-        state=self.states[self.default]
+  def __call__(self,size:float|int=1,state:str|None=None,dir:int=0,frame:int|None=None,otime:float=0,nowarn:bool=False)->pg.Surface:
+    state=self.getstate(state,nowarn)
+    dir=dir%state.directions
     surf=pg.Surface([self.frame_x,self.frame_y],flags=pg.SRCALPHA)
     if frame==None:
-      frame=state.getframe(dir)
+      frame=state.getframe(dir,otime=otime)
     row=state.image_x/self.frame_x
     x=frame%row*self.frame_x
     y=frame//row*self.frame_y
     surf.blit(state.image,[-x,-y])
-    return pg.transform.scale_by(surf,size)
+    if size!=1:
+      surf=pg.transform.scale_by(surf,size)
+    return surf
   def getstateframes(self,state:str=None,dir:int=0)->int:
     if state==None:state=self.states[self.default]
     else:state=self.states[state]
     return state.getframes(dir)
+  def getstate(self,state:str=None,nowarn:bool=False):
+    if state==None:
+      state=self.states[self.default]
+    else:
+      state=str(state)
+    if state in self.states.keys():
+      return self.states[state]
+    else:
+      if self.path!="Textures/deprecated.rsi" and not nowarn:
+        print(f"Tried to get state \"{state}\" of object \"{self.path}\"")
+      return self.states[self.default]
   def getstates(self)->list:return self.states.keys()
-  def getdirs(self,state=None):
+  def getframe(self,state:str=None,dir:int=0,frame:int=None,otime:float=0,nowarn:bool=False)->int:
+    state=self.getstate(state,nowarn)
+    return state.getframe(dir,frame,otime)
+  def getdirs(self,state=None,nowarn=False):
     if state==None: state=self.states[self.default]
     else:
       state=str(state)
       if state in self.states.keys():
           state=self.states[state]
       else:
-        if self.path!="Textures/deprecated.rsi":
-          print(f"Tried to get state \"{state}\" of object \"{self.path}\"")
+        if self.path!="Textures/deprecated.rsi" and not nowarn:
+          print(f"Tried to get state dirs \"{state}\" of object \"{self.path}\"")
         state=self.states[self.default]
     return state.directions
 
@@ -115,11 +125,6 @@ def yml(path,raw=False):
 
 class Floor:
   def __init__(self,id:str="Space",source:os.PathLike="default"):
-    #for item in mig:
-    #  if item["id"]==id:
-    #    id=item["target"]
-    #    break
-    #tile=next((item for item in tiles if item["id"]==id),None)
     try:
       id=mig[id]["target"]
     except:pass
@@ -317,4 +322,8 @@ def ensuredir(path):
     if os.path.isdir(cpath): continue
     os.mkdir(cpath)
 
-
+def rotate_vector(vector:list[float,float],angle:float):
+  angle_rad=math.radians(angle)
+  return [
+    vector[0]*math.cos(angle_rad)-vector[1]*math.sin(angle_rad),
+    vector[0]*math.sin(angle_rad)+vector[1]*math.cos(angle_rad)]

@@ -5,7 +5,6 @@ import random
 import math
 import pickle
 from tqdm import tqdm
-
 import Utils.events as events
 import Utils.parents as parents
 import Utils.shared as shared
@@ -19,8 +18,7 @@ import Modules.map as map
 from Modules.rsi import *
 from Modules.parallax import Parallax
 from Modules.entityModule import Entity
-import hashlib as sha
-import cProfile
+#import cProfile
 
 
 def optc(c,d):return math.floor((c+d/64)/16)
@@ -30,16 +28,20 @@ clock=pg.time.Clock()
 speed=0.2
 pg.init()
 WIDTH,HEIGHT=1024,512
-disp=pg.display.set_mode([WIDTH,HEIGHT],pg.RESIZABLE)
+screen=pg.display.set_mode([WIDTH,HEIGHT],pg.RESIZABLE)
+disp=pg.Surface((WIDTH/2,HEIGHT/2))
 
-map_file=map.loadmap("Reach")
+map_inst=map.Grid("Box")
+shared.set("map",map_inst)
+map_file=map_inst.raw
 
-tilemap=map_file["tilemap"]
-cmap,grid=map.loadfloor(map_file)
+cmap,grid=map_inst.chunkMap,map_inst.chunkGrid
 
 
 def topdict(input_dict:dict)->list:
   return "{"+",".join([f'{item[0]}:{item[1]}' for item in sorted(input_dict.items(),key=lambda item:item[1],reverse=True)])+"}"
+
+
 
 entities=[]
 uids=[]
@@ -54,8 +56,8 @@ for entitype in tqdm(map_file["entities"],desc="loading entities"):
     entities.append(Entity(entity["uid"],components=basecomps+entity["components"]))
     uids.append(entity["uid"])
     if len(entities)!=len(uids):raise BaseException(f"uids:{len(uids)} ents:{len(entites)}")
-print("pinging...")
-events.call("pingpos")
+#print("pinging...")
+events.call("pingpos",bar="Pinging")
 events.call("start")
 print(topdict(entityModule.wanted_comps))
 
@@ -68,11 +70,12 @@ except:
 parallax=Parallax(parallax_id)
 decals=[]
 
-tiledict=dict([(a,Floor(b)) for a,b in tqdm(tilemap.items(),desc="Ordering tiles")])
+
 
 map_decals=findict(map_file["entities"],
   "type","DecalGrid",5)["chunkCollection"]["nodes"]
 drawdepths=[
+  "Dno",
   "LowFloors",
   "ThickPipe",
   "ThickWire",
@@ -101,11 +104,6 @@ drawdepths=[
 for decal in map_decals:
   decals.append(Decal(decal))
 
-#entity=Entity("AirlockEngineering")
-#etexture=RSI(joinpath("Textures",entity.components[0]["sprite"]))
-#scrubber=RSI("Textures/Structures/Piping/Atmospherics/scrubber.rsi/")
-#suscrubber=RSI("Textures/Structures/Piping/Atmospherics/Portable/portable_scrubber.rsi/")
-#vent=RSI("Textures/Structures/Piping/Atmospherics/vent.rsi/")
 mapsize=[0,0,0,0]
 for o in cmap:
   if o[0]<mapsize[0]:mapsize[0]=o[0]
@@ -119,28 +117,38 @@ for c in grid:
   surf.fill([0,0,0,0])
   for x in range(16):
     for y in range(16):
-      tile=tiledict[map.decode(c[y][x])]
+      tile=map_inst.tiledict[map.decode(c[y][x])]
       if tile.sprite:
         surf.blit(tile(),[32*x,32*(15-y)])
   chunks.append(surf.copy())
 for dec in decals:
   dec.prebake(chunks,cmap)
 
+font=pg.font.Font()
 print("cycle startred")
 def run():
-  global sx,sy,WIDTH,HEIGHT,px,py
+  global sx,sy,WIDTH,HEIGHT,px,py,disp
   while 1:
-    #disp.fill([0,0,0])
+    hover="Erro"
+    for ret in events.call("frame",noreturn=False):
+      if type(ret)!=dict:continue
+      if not "hover" in ret.keys():continue
+      hover=ret["hover"]
+    #disp.fill([0,0,0,0])
     parallax.draw(disp,px,py)
     xr,yr=optc2(sx,WIDTH),optc2(sy,HEIGHT)
-    for y in yr:
-      for x in xr:
-        cpos=[x,y]
-        if cpos in cmap:
-          dpos=[512*x-px+WIDTH//2,-480-512*y+py+HEIGHT//2]
-          disp.blit(chunks[cmap.index(cpos)],dpos)
     for depth in drawdepths:
-      events.call("render",{"dst":disp,"pos":[px,py],"depth":depth})
+      for y in yr:
+        for x in xr:
+          cpos=[x,y]
+          if depth=="Dno":
+            if cpos in cmap:
+              dpos=[512*x-px+WIDTH//4,-480-512*y+py+HEIGHT//4]
+              disp.blit(chunks[cmap.index(cpos)],dpos)
+          else:
+            events.call(f"render:{depth}:{cpos}",{"dst":disp,"pos":[px,py],"depth":depth})
+    screen.blit(pg.transform.scale_by(disp,2),(0,0))
+    screen.blit(font.render(str(hover),True,[255,0,0]),[10,10])
     pg.display.flip()
     clock.tick(60)  #fps limiter
     for event in pg.event.get():  #event handler
@@ -149,6 +157,7 @@ def run():
         quit(1488)
       if event.type==pg.VIDEORESIZE:
         WIDTH,HEIGHT=event.w,event.h
+        disp=pg.Surface((WIDTH/2,HEIGHT/2))
         pg.display.set_mode([WIDTH,HEIGHT],pg.RESIZABLE)
     key=pg.key.get_pressed()
     if key:

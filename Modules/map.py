@@ -3,7 +3,10 @@ import pickle
 
 alpha=[chr(i) for i in list(range(65,91))+list(range(97,123))]
 beta=["A","Q","g","w"]
-def decode(code):
+
+
+def decode(code:str)->int:
+  """scary letters to numbers"""
   a=alpha.index(code[0])*4
   if code[1] in beta:
     return a+beta.index(code[1])
@@ -49,3 +52,17 @@ class Grid:
   def __init__(self,id):
     self.raw=loadmap(id)
     self.anchoredgrid={}
+    self.chunkMap,self.chunkGrid=loadfloor(self.raw)
+    self.tiledict=dict([(a,Floor(b)) for a,b in tqdm(self.raw["tilemap"].items(),desc="Ordering tiles")])
+  def getChunk(self,pos:list[int,int])->list|None:
+    if pos in self.chunkMap:
+      return self.chunkGrid[self.chunkMap.index(pos)]
+    else:return
+  def getTile(self,pos:list[int,int]):
+    cpos=[int(pos[0]//16),int(pos[1]//16)]
+    chunk=self.getChunk(cpos)
+    if not chunk:
+      num=0
+    else:
+      num=decode(chunk[int(pos[1])%16][int(pos[0])%16])
+    return self.tiledict[num]

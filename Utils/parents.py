@@ -17,6 +17,19 @@ def typedict(todict:list)->dict:
   except:pass
   return result
 
+def merge(old:list,new:list)->list:
+  part=typedict(old)
+  compt=typedict(new)
+  confls=set(part.keys())&set(compt.keys())
+  result=part.copy()
+  result.update(compt)
+  for confl in confls:
+    temp=part[confl].copy()
+    temp.update(compt[confl])
+    result.update({confl:temp})
+  return list(result.values())
+
+
 def parent(id:str)->list:
   if id in chainmap:
     return chains[chainmap.index(id)]
@@ -35,19 +48,7 @@ def parent(id:str)->list:
     if parids:
       if type(parids)!=ruamel.yaml.CommentedSeq:
         parids=[parids]
-      for parid in parids:
-        part=typedict(parent(parid))
-      compt=typedict(comps)
-      confls=set(part.keys())&set(compt.keys())
-      result=part.copy()
-      result.update(compt)
-      for confl in confls:
-        temp=part[confl].copy()
-        temp.update(compt[confl])
-        result.update({confl:temp})
-      if not compt:
-        print(proto)
-      resultlist=list(result.values())
+      resultlist=merge(parent(parids[0]),comps)
     else:
       resultlist=list(comps)
     chainmap.append(id)

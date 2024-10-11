@@ -8,6 +8,7 @@ class Entity:
     self.uid=uid
     self.pos=[0,0]
     self.rot=0
+    self.proto=id
     comps={}
     self.components={}
     if id:
@@ -34,7 +35,8 @@ def find(uid):
   if not uid in uids:
     print(f"no {uid} in uids")
     return
-  if uids.index(uid)>=len(ents):
-    print(f"uid({uid}) in place {uids.index(uid)}/{len(uids)} is higher than ents len {len(ents)}")
+  uidindex=uids.index(uid)
+  if uidindex>=len(ents):
+    print(f"uid({uid}) in place {uidindex}/{len(uids)} is higher than ents len {len(ents)}")
     return
-  return ents[uids.index(uid)]
+  return ents[uidindex]
