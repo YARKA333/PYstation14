@@ -4,20 +4,22 @@ import os.path
 import numba
 #import yaml
 import math
-from tqdm import tqdm
+#from tqdm import tqdm
 import time
 import pygame as pg
 import json
 import random
 import pickle
 import ruamel
-from ruamel import yaml
+from ruamel import yaml as ryaml
 from pathlib import Path
 from zipfile import ZipFile
+from colors import colors
 #from threading import Thread
-ss14_folder="C:/Servers/SS14 c2"
-yaml=ruamel.yaml.YAML(typ='rt')
+ss14_folder="C:/Servers/SS14 c2/Resources/"
+yaml=ryaml.YAML(typ='rt')
 allr={}
+pg.init()
 
 class _State:
   def __init__(self,path,state,source=None):
@@ -31,9 +33,9 @@ class _State:
       self.delays=state["delays"]
     else: self.delays=None
   def getframe(self,dir=0,frame:int=None,otime:float=0)->int:
+    if self.delays==None: return dir
+    delay=self.delays[dir]
     if frame==None:
-      if self.delays==None: return dir
-      delay=self.delays[dir]
       secs=(time.time()-otime)%sum(delay)
       summ=0
       for frame in range(len(delay)):
@@ -106,13 +108,25 @@ class RSI:
         state=self.states[self.default]
     return state.directions
 
-def hextorgb(hex:str)->list:
+def findcolor(color:str):
+  new=hextorgb(color,True)
+  if new:return new
+  new=colors.get(color.capitalize())
+  if new:return new
+  print(f"color not found: {color}")
+  return [255,0,255]
+
+def hextorgb(hex:str,nowarn=False)->list:
   """Converts hex color string to rgb(a) format
   \n For example:
   \n   '#FF2AB5EC' -> [255,42,181,236]"""
 
   hex2=hex.replace("#","")
-  return [int(hex2[i*2:i*2+2],16) for i in range(len(hex2)//2)]
+  try:
+    return [int(hex2[i*2:i*2+2],16) for i in range(len(hex2)//2)]
+  except:
+    if not nowarn:
+      print(f"hextorgb failed: {hex}")
 
 def yml(path,raw=False):
   try:
@@ -174,11 +188,6 @@ class Decal:
     self.sprite.set_alpha(color[3])
     self.instances=dict([(c,[float(b) for b in a.split(",")]) for c,a in data["decals"].items()])
 
-  def render(self):
-    global disp
-    for ins in self.instances.values():
-      if abs((ins[0]*32-px)*2)-32<WIDTH and abs((py-ins[1]*32)*2)-32<HEIGHT:
-        disp.blit(self.sprite,[ins[0]*32-px+WIDTH/2,-ins[1]*32+py+HEIGHT/2])
   def prebake(self,chunks,cmap):
     for ins in self.instances.values():
       cpos=[ins[i]//16 for i in [0,1]]
@@ -189,7 +198,7 @@ def openfile(path,source=None):
   if not source:source=ss14_folder
   assert os.path.isdir(source)
   #try:
-  jpath=Path(joinpath(source,"Resources",path))
+  jpath=Path(joinpath(source,path))
   return io.BytesIO(jpath.read_bytes())
   #except:pass
   #try:
@@ -201,7 +210,7 @@ def listdir(path,source=None):
   if not source: source=ss14_folder
   assert os.path.isdir(source)
   try:
-    return os.listdir(joinpath(source,"Resources",path))
+    return os.listdir(joinpath(source,path))
   except:pass
   try:
     with ZipFile(joinpath(source,"Content.Client.zip")) as archive:
@@ -213,7 +222,7 @@ def namelist(path,source=None):
   if source=="Project": fpath=path
   else:
     if not source: source=ss14_folder
-    fpath=joinpath(source,"Resources",path)
+    fpath=joinpath(source,path)
   #try:
   e=[]
   for a,b,c in os.walk(fpath):
@@ -230,7 +239,7 @@ def namelist(path,source=None):
   #except:raise Exception("incorrect path: "+path)
 
 @numba.njit(cache=1)
-def joinpath(*paths:str):
+def joinpath(*paths:str|os.PathLike):
   result=""
   for path in paths:
     if path=="":continue
@@ -278,7 +287,7 @@ def findproto_yml(id:str,type=None):
     protos=yml(file,True)
     return findproto(id,protos)
 
-def strtuple(cor:str)->tuple:
+def strtuple(cor:str)->list[int]:
   return [int(a) for a in cor.split(",")]
 
 def findproto(id,list:list):
@@ -323,7 +332,9 @@ def ensuredir(path):
     os.mkdir(cpath)
 
 def rotate_vector(vector:list[float,float],angle:float):
+  if vector==[0,0]:return vector
   angle_rad=math.radians(angle)
   return [
     vector[0]*math.cos(angle_rad)-vector[1]*math.sin(angle_rad),
     vector[0]*math.sin(angle_rad)+vector[1]*math.cos(angle_rad)]
+

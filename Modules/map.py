@@ -1,32 +1,33 @@
 from Modules.rsi import *
+from tqdm import tqdm
 import pickle
 
 alpha=[chr(i) for i in list(range(65,91))+list(range(97,123))]
 beta=["A","Q","g","w"]
 
 
-def decode(code:str)->int:
+def decode(code:str)->int|None:
   """scary letters to numbers"""
   a=alpha.index(code[0])*4
   if code[1] in beta:
     return a+beta.index(code[1])
   return None
 
-def loadmap(id):
-    mapPath:str=findproto_yml(id,"gameMap")["mapPath"]
-    print("loading map")
+def loadmap(mapid):
+    mapPath:str=findproto_yml(mapid,"gameMap")["mapPath"]
+    print("loading layerMap")
     kakePath=joinpath("kake",mapPath.replace(".yml",".pk"))
     if os.path.exists(kakePath):
       print("cache found!")
-      with open(kakePath,"rb") as file:
-        map_file=pickle.load(file)
+      with open(kakePath,"rb") as kakefile:
+        map_file=pickle.load(kakefile)
     else:
-      print("cache not found\nProcessing map...")
+      print("cache not found\nProcessing layerMap...")
       map_file=yml(mapPath)
       ensuredir(kakePath)
-      with open(kakePath,"xb") as file:
-        pickle.dump(map_file,file)
-    print("loaded map")
+      with open(kakePath,"xb") as kakefile:
+        pickle.dump(map_file,kakefile)
+    print("loaded layerMap")
     return map_file
 
 def loadfloor(map_file):
@@ -49,16 +50,16 @@ def loadfloor(map_file):
   return [cmap,grid]
 
 class Grid:
-  def __init__(self,id):
-    self.raw=loadmap(id)
+  def __init__(self,mapid):
+    self.raw=loadmap(mapid)
     self.anchoredgrid={}
     self.chunkMap,self.chunkGrid=loadfloor(self.raw)
     self.tiledict=dict([(a,Floor(b)) for a,b in tqdm(self.raw["tilemap"].items(),desc="Ordering tiles")])
-  def getChunk(self,pos:list[int,int])->list|None:
+  def getChunk(self,pos:list[int])->list|None:
     if pos in self.chunkMap:
       return self.chunkGrid[self.chunkMap.index(pos)]
     else:return
-  def getTile(self,pos:list[int,int]):
+  def getTile(self,pos:list[int]):
     cpos=[int(pos[0]//16),int(pos[1]//16)]
     chunk=self.getChunk(cpos)
     if not chunk:

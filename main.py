@@ -10,6 +10,8 @@ import Utils.parents as parents
 import Utils.shared as shared
 from Utils.multidict import Multidict
 
+
+
 sharedgrid=Multidict()
 shared.set("globalgrid",sharedgrid)
 
@@ -18,21 +20,26 @@ import Modules.map as map
 from Modules.rsi import *
 from Modules.parallax import Parallax
 from Modules.entityModule import Entity
+from Components.OccluderComponent import FOV
 #import cProfile
 
 
 def optc(c,d):return math.floor((c+d/64)/16)
 def optc2(c,d):return range(optc(c,-d),optc(c,d)+1)
 
+lmode=0
+fov=FOV()
 clock=pg.time.Clock()
 speed=0.2
 pg.init()
+
 WIDTH,HEIGHT=1024,512
 screen=pg.display.set_mode([WIDTH,HEIGHT],pg.RESIZABLE)
 disp=pg.Surface((WIDTH/2,HEIGHT/2))
+smap=pg.mask.Mask((WIDTH/2,HEIGHT/2))
 
-map_inst=map.Grid("Box")
-shared.set("map",map_inst)
+map_inst=map.Grid("Reach")
+shared.set("layerMap",map_inst)
 map_file=map_inst.raw
 
 cmap,grid=map_inst.chunkMap,map_inst.chunkGrid
@@ -112,6 +119,7 @@ for o in cmap:
   if o[1]>mapsize[3]:mapsize[3]=o[1]
 sx=sy=px=py=0
 chunks=[]
+chunkmasks:list[pg.mask.Mask]=[]
 surf=pg.Surface([512,512],pg.SRCALPHA)
 for c in grid:
   surf.fill([0,0,0,0])
@@ -121,13 +129,15 @@ for c in grid:
       if tile.sprite:
         surf.blit(tile(),[32*x,32*(15-y)])
   chunks.append(surf.copy())
+
 for dec in decals:
   dec.prebake(chunks,cmap)
-
+for c in chunks:
+  chunkmasks.append(pg.mask.from_surface(c))
 font=pg.font.Font()
 print("cycle startred")
 def run():
-  global sx,sy,WIDTH,HEIGHT,px,py,disp
+  global sx,sy,WIDTH,HEIGHT,px,py,disp,lmode,smap
   while 1:
     hover="Erro"
     for ret in events.call("frame",noreturn=False):
@@ -135,6 +145,7 @@ def run():
       if not "hover" in ret.keys():continue
       hover=ret["hover"]
     #disp.fill([0,0,0,0])
+    smap.fill()
     parallax.draw(disp,px,py)
     xr,yr=optc2(sx,WIDTH),optc2(sy,HEIGHT)
     for depth in drawdepths:
@@ -144,11 +155,15 @@ def run():
           if depth=="Dno":
             if cpos in cmap:
               dpos=[512*x-px+WIDTH//4,-480-512*y+py+HEIGHT//4]
-              disp.blit(chunks[cmap.index(cpos)],dpos)
+              ind=cmap.index(cpos)
+              disp.blit(chunks[ind],dpos)
+              smap.erase(chunkmasks[ind],dpos)
           else:
-            events.call(f"render:{depth}:{cpos}",{"dst":disp,"pos":[px,py],"depth":depth})
+            events.call(f"render:{depth}:{cpos}",{"dst":disp,"smap":smap,"pos":[px,py],"depth":depth})
     screen.blit(pg.transform.scale_by(disp,2),(0,0))
+    fov.draw(screen,[px*2,-py*2],mode=lmode,mask=smap.scale((WIDTH,HEIGHT)))
     screen.blit(font.render(str(hover),True,[255,0,0]),[10,10])
+    screen.blit(font.render(str(pg.mouse.get_cursor()),True,[255,0,0]),[10,20])
     pg.display.flip()
     clock.tick(60)  #fps limiter
     for event in pg.event.get():  #event handler
@@ -158,7 +173,12 @@ def run():
       if event.type==pg.VIDEORESIZE:
         WIDTH,HEIGHT=event.w,event.h
         disp=pg.Surface((WIDTH/2,HEIGHT/2))
+        smap=pg.mask.Mask((WIDTH/2,HEIGHT/2))
         pg.display.set_mode([WIDTH,HEIGHT],pg.RESIZABLE)
+        events.call("resize",{"real":[WIDTH,HEIGHT],"render":[WIDTH/2,HEIGHT/2]})
+      if event.type==pg.KEYDOWN:
+        if event.key==pg.K_l:
+          lmode=(lmode+1)%3
     key=pg.key.get_pressed()
     if key:
       if key[pg.key.key_code("w")]: sy+=speed

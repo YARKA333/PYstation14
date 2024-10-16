@@ -84,7 +84,7 @@ class IconSmooth:
          self.nbrs[i%8]*4+
          self.nbrs[(i+1)%8]*2+
          self.nbrs[(i+2)%8]}"
-      events.call("setspritelayer",{"index":int(i/2),"state":state,"dir":i//2},self.uid)
+      events.call("setspritelayer",{"index":int(i/2),"state":state,"dir":i//2,"force":True},self.uid)
       #self.sprite.blit(self.rsi(1,state,
       #   [0,2,1,3][i//2]),[0,0])
   def OnPing(self,args):

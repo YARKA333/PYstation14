@@ -1,6 +1,7 @@
 import Utils.shared as shared
 import Utils.parents as parents
 import Components.component as component
+import copy
 wanted_comps={}
 
 class Entity:
@@ -18,7 +19,7 @@ class Entity:
     for name,comp in comps.items():
       compclass=component.getcomponent(name)
       if compclass:
-        compobj=compclass(self,comp)
+        compobj=compclass(self,copy.deepcopy(comp))
         self.components.update({name:compobj})
       else:
         alr=dict.get(wanted_comps,name) or 0

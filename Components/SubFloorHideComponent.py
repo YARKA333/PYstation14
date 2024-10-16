@@ -4,7 +4,7 @@ import Utils.events as events
 class SubFloorHide:
   def __init__(self,entity,args):
     self.pos=None
-    self.map=shared.get("map")
+    self.map=shared.get("layerMap")
     self.uid=entity.uid
     events.followcomp("Transform",self.Transform,entity)
     events.followcomp("Sprite",self.Sprite,entity)
