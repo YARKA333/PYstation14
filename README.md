@@ -1,4 +1,4 @@
-SS14 (Билд Corvax) на Python!
+SS14 на Python!
 
 !!
 
