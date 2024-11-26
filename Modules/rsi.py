@@ -12,11 +12,15 @@ import random
 import pickle
 import ruamel
 from ruamel import yaml as ryaml
+import Utils.shared as shared
 from pathlib import Path
 from zipfile import ZipFile
 from colors import colors
 #from threading import Thread
-ss14_folder="C:/Servers/SS14 c2/Resources/"
+
+if __name__=="__main__":
+  raise RuntimeError("why did you do this")
+
 yaml=ryaml.YAML(typ='rt')
 allr={}
 pg.init()
@@ -195,7 +199,7 @@ class Decal:
       chunks[cmap.index(cpos)].blit(self.sprite,dpos)
 
 def openfile(path,source=None):
-  if not source:source=ss14_folder
+  if not source:source=shared.get("resources")
   assert os.path.isdir(source)
   #try:
   jpath=Path(joinpath(source,path))
@@ -207,7 +211,7 @@ def openfile(path,source=None):
   #except:raise Exception("incorrect path: "+path)
 
 def listdir(path,source=None):
-  if not source: source=ss14_folder
+  if not source: source=shared.get("resources")
   assert os.path.isdir(source)
   try:
     return os.listdir(joinpath(source,path))
@@ -218,18 +222,23 @@ def listdir(path,source=None):
   except:raise Exception("incorrect path: "+path)
 
 #@numba.njit(cache=1)
-def namelist(path,source=None):
-  if source=="Project": fpath=path
-  else:
-    if not source: source=ss14_folder
-    fpath=joinpath(source,path)
+def namelist(path:str,source=None,full=False):
+  if not path.startswith("C:/"):
+    if source=="Project": fpath=path
+    else:
+      if not source: source=shared.get("resources")
+      fpath=joinpath(source,path)
+  else:fpath=path
   #try:
   e=[]
   for a,b,c in os.walk(fpath):
     a=a.replace(fpath,"")
     for d in c:
       try:
-        e.append(joinpath(a,d))
+        e.append(
+          joinpath(path,a,d)
+          if full else
+          joinpath(a,d))
       except IndexError:print(f'a:{a},d:{d}')
   return e
   #except:pass
@@ -238,7 +247,7 @@ def namelist(path,source=None):
   #    return[f.split("/")[-1] for f in archive.namelist() if f.startswith(path)]
   #except:raise Exception("incorrect path: "+path)
 
-@numba.njit(cache=1)
+#@numba.njit(cache=1)
 def joinpath(*paths:str|os.PathLike):
   result=""
   for path in paths:
@@ -278,15 +287,6 @@ def findict(dicts,key,value=None,maxdepth=0):
 def angle(raw:str):
   return round(float(raw.split(" ")[0])/math.pi*180)
 
-def findproto_yml(id:str,type=None):
-  names=namelist("opti_proto","Project")
-  search=f"{id.upper()[0]}.yml"
-  if type:
-    search=joinpath(type,search)
-  for file in [joinpath("opti_proto",name) for name in names if name.endswith(search)]:
-    protos=yml(file,True)
-    return findproto(id,protos)
-
 def strtuple(cor:str)->list[int]:
   return [int(a) for a in cor.split(",")]
 
@@ -298,25 +298,24 @@ def findproto(id,list:list):
     except:
       print(f"dolbany shashlik:\n{proto}")
 
-def gettypeyml(type):
-  try:
-    dir=joinpath("opti_proto",type)
-    files=os.listdir(joinpath("opti_proto",type))
-    protos=[]
-    for file in files:
-      protos+=yml(joinpath(dir,file),True)
-    return dict([(proto["id"],proto) for proto in protos])
-  except FileNotFoundError:print("gettypeyml is currently unaviable")
-
-print("loading yaml")
-with open("kake/prototypes.pk","rb") as file:
-  allprotos=pickle.load(file)
-allp=allprotos["entity"]
-mig=allprotos["tileAlias"]
-tiles=allprotos["tile"]
-decal_protos=allprotos["decal"]
+allprotos={}
+allp={}
+mig={}
+tiles={}
+decal_protos={}
 decal_rsi={}
-print("loaded yaml")
+
+def load_protos():
+  global allprotos,allp,mig,tiles,decal_protos
+  print("loading protos")
+  with open("kake/prototypes.pk","rb") as file:
+    allprotos|=pickle.load(file)
+  allp|=allprotos["entity"]
+  mig|=allprotos["tileAlias"]
+  tiles|=allprotos["tile"]
+  decal_protos|=allprotos["decal"]
+  print("loaded",len(allp),"protos")
+  print()
 
 def vec(a):
   return [max(-1,min(1,abs(4-(a+i)%8)-2)) for i in [-2,0]]

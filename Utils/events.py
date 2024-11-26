@@ -34,40 +34,9 @@ def subscribeorder(name,function,order=None):
   events.update({order:orderevents})
   eventorders.update({name:events})
 
-def unsubscribe_deprecated(name=None,function=None,entity=None):
-  global eventdata,entity_eventdata
-  if entity:
-    collection=dict.get(entity_eventdata,entity,{})
-  else:
-    collection=eventdata
-  if name:
-    if not name in collection.keys():
-      print(f"No event called \"{name}\"")
-    elif function:
-      events=dict.get(collection,name,[])
-      if function in events:
-        events.remove(function)
-        collection.update({name:events})
-      #else:print(f"No function {function} in {name}")
-    else:
-        collection.update({name:[]})
-  elif function:
-    a=0
-    for n,f in collection.items():
-      if function in f:
-        a=1
-        f.remove(function)
-        collection.update({n,f})
-    if not a:print(f"there was no {function} in events")
-  else:raise BaseException("unsubscrive w/o arguments!")
-
-
-  events.append(function)
-  collection.update({name:events})
-  if entity:
-    entity_eventdata.update({entity:collection})
-  else:
-    eventdata=collection
+def delentity(uid:int):
+  if uid in entity_eventdata:
+    entity_eventdata.pop(uid)
 
 def sortorder(name):
   global eventdata,eventorders

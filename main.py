@@ -10,16 +10,20 @@ import Utils.parents as parents
 import Utils.shared as shared
 from Utils.multidict import Multidict
 
-
-
 sharedgrid=Multidict()
 shared.set("globalgrid",sharedgrid)
+
+ss14_folder="C:/Servers/SS14 c2/Resources/"
+shared.set("resources",ss14_folder)
+
+pg.init()
 
 import Modules.entityModule as entityModule
 import Modules.map as map
 from Modules.rsi import *
 from Modules.parallax import Parallax
 from Modules.entityModule import Entity
+import Modules.UInput as UInput
 from Components.OccluderComponent import FOV
 #import cProfile
 
@@ -32,14 +36,19 @@ fov=FOV()
 clock=pg.time.Clock()
 speed=0.2
 pg.init()
+load_protos()
 
 WIDTH,HEIGHT=1024,512
 screen=pg.display.set_mode([WIDTH,HEIGHT],pg.RESIZABLE)
+pg.display.set_caption("PyStation 14")
+pg.display.set_icon(pg.image.load("icon.png"))
 disp=pg.Surface((WIDTH/2,HEIGHT/2))
 smap=pg.mask.Mask((WIDTH/2,HEIGHT/2))
 
-map_inst=map.Grid("Reach")
+
+map_inst=map.Grid("Dev")
 shared.set("layerMap",map_inst)
+
 map_file=map_inst.raw
 
 cmap,grid=map_inst.chunkMap,map_inst.chunkGrid
@@ -56,11 +65,8 @@ shared.set("entities",entities)
 shared.set("uids",uids)
 for entitype in tqdm(map_file["entities"],desc="loading entities"):
   if entitype["proto"]=="":continue
-  basecomps=parents.parent(entitype["proto"])
-  if not basecomps:
-    continue
   for entity in entitype["entities"]:
-    entities.append(Entity(entity["uid"],components=basecomps+entity["components"]))
+    entities.append(Entity(entity["uid"],entitype["proto"],entity["components"]))
     uids.append(entity["uid"])
     if len(entities)!=len(uids):raise BaseException(f"uids:{len(uids)} ents:{len(entites)}")
 #print("pinging...")
@@ -79,8 +85,7 @@ decals=[]
 
 
 
-map_decals=findict(map_file["entities"],
-  "type","DecalGrid",5)["chunkCollection"]["nodes"]
+map_decals=map_inst.comps["DecalGrid"]["chunkCollection"]["nodes"]
 drawdepths=[
   "Dno",
   "LowFloors",
@@ -140,7 +145,7 @@ def run():
   global sx,sy,WIDTH,HEIGHT,px,py,disp,lmode,smap
   while 1:
     hover="Erro"
-    for ret in events.call("frame",noreturn=False):
+    for ret in events.call("frame",{"dpos":[px,py],"gpos":[sx,sy]},noreturn=False):
       if type(ret)!=dict:continue
       if not "hover" in ret.keys():continue
       hover=ret["hover"]
@@ -163,7 +168,13 @@ def run():
     screen.blit(pg.transform.scale_by(disp,2),(0,0))
     fov.draw(screen,[px*2,-py*2],mode=lmode,mask=smap.scale((WIDTH,HEIGHT)))
     screen.blit(font.render(str(hover),True,[255,0,0]),[10,10])
-    screen.blit(font.render(str(pg.mouse.get_cursor()),True,[255,0,0]),[10,20])
+    name="None"
+    events.call("overlay",{"surf":screen})
+    if hover in uids:
+      comp=entityModule.getEcomp(hover,"MetaData")
+      if comp:
+        name=comp.name
+    screen.blit(font.render(name,True,[255,0,0]),[10,20])
     pg.display.flip()
     clock.tick(60)  #fps limiter
     for event in pg.event.get():  #event handler
@@ -179,6 +190,8 @@ def run():
       if event.type==pg.KEYDOWN:
         if event.key==pg.K_l:
           lmode=(lmode+1)%3
+        if event.key==pg.K_F5:
+          UInput.spawn.start()
     key=pg.key.get_pressed()
     if key:
       if key[pg.key.key_code("w")]: sy+=speed

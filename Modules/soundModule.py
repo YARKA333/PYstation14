@@ -6,7 +6,7 @@ pg.mixer.init()
 soundlib={}
 def getsound(spec):
   if "path" in spec.keys():
-    path=joinpath(ss14_folder,spec["path"])
+    path=joinpath(shared.get("resources"),spec["path"])
     if path in soundlib.keys():
       sound=soundlib[path]
     else:

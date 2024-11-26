@@ -2,20 +2,33 @@ import Utils.shared as shared
 import Utils.parents as parents
 import Components.component as component
 import copy
+import Utils.events as events
+from Modules.rsi import allp
 wanted_comps={}
+maxuid=0
+
 
 class Entity:
-  def __init__(self,uid,id:str=None,components:list=None):
+  def __init__(self,uid,proto:str=None,components:list=None,verb:bool=False):
+    global maxuid
     self.uid=uid
+    if uid>=maxuid:
+      maxuid=uid+1
     self.pos=[0,0]
     self.rot=0
-    self.proto=id
     comps={}
     self.components={}
-    if id:
-      comps.update(parents.typedict(parents.parent(id)))
+    self.meta={"No":"pe"}
+    if proto:
+      comps=typemerge(comps,parents.typedict(parents.parent(proto)))
+      self.meta={"MetaData":{
+        "type":"MetaData",
+        "proto":proto,
+      }}
+      comps.update(self.meta)
+
     if components:
-      comps.update(parents.typedict(components))
+      comps=typemerge(comps,parents.typedict(components))
     for name,comp in comps.items():
       compclass=component.getcomponent(name)
       if compclass:
@@ -25,10 +38,11 @@ class Entity:
         alr=dict.get(wanted_comps,name) or 0
         alr+=1
         wanted_comps.update({name:alr})
+    if verb:print(f"created entity {uid} with {list(self.components.keys())}")
   def hascomp(self,name):
-    return name in self.components.keys()
+    return name in self.components
   def comp(self,name):
-    return dict.get(self.components,name)
+    return self.components.get(name)
 
 def find(uid):
   uids=shared.get("uids")
@@ -41,3 +55,33 @@ def find(uid):
     print(f"uid({uid}) in place {uidindex}/{len(uids)} is higher than ents len {len(ents)}")
     return
   return ents[uidindex]
+
+def typemerge(old:dict,new:dict)->dict:
+  confls=set(old.keys())&set(new.keys())
+  result=old.copy()
+  result.update(new)
+  for confl in confls:
+    temp=old[confl].copy()
+    temp.update(new[confl])
+    result.update({confl:temp})
+  return result
+
+def spawn(proto:str|None=None,comps:list[dict]|None=None)->int:
+  global maxuid
+  if not proto in allp:
+    print(f"invalid proto \"{proto}\"")
+  uids=shared.get("uids")
+  ents=shared.get("entities")
+  uid=maxuid
+  maxuid+=1
+  ents.append(Entity(uid,proto,comps,True))
+  uids.append(uid)
+
+def getEcomp(uid,comp):
+  uids=shared.get("uids")
+  ents=shared.get("entities")
+  return ents[uids.index(uid)].comp(comp)
+
+def delete(uid:int):
+  events.delentity(uid)
+  shared.get("entities").pop(uid)

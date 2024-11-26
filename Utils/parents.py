@@ -6,15 +6,15 @@ import pickle
 chains=[]
 chainmap=[]
 
-with open("kake/entity.pk","rb") as file:
-  allp=pickle.load(file)
+#with open("kake/entity.pk","rb") as file:
+#  allp=pickle.load(file)
 
 def typedict(todict:list)->dict:
   result={}
   try:
     for a in todict:
       result.update({a["type"]:a})
-  except:pass
+  except:print(a)
   return result
 
 def merge(old:list,new:list)->list:
@@ -30,28 +30,24 @@ def merge(old:list,new:list)->list:
   return list(result.values())
 
 
-def parent(id:str)->list:
-  if id in chainmap:
-    return chains[chainmap.index(id)]
+def parent(protoid:str)->list:
+  if protoid in chainmap:
+    return chains[chainmap.index(protoid)]
   else:
-    proto=dict.get(allp,id,{})
+    if isinstance(protoid,list):
+      protoid=protoid[0]
+    proto=allp.get(protoid,{})
     if not proto:
-      #print(f'proto {id} not in \"allp\", searching...')
-      #proto=findproto_yml(id,"entity")
-      #if proto:
-      #  print(f'{id} was found! Check \"allp\"')
-      #else:
-      print(f'{id} not found, program may not load')
-      #  return
-    parids=dict.get(proto,"parent")
-    comps=dict.get(proto,"components",[])
+      print(f'{protoid} not found, program may not load')
+    parids=proto.get("parent")
+    comps=proto.get("components",[])
     if parids:
       if type(parids)!=ruamel.yaml.CommentedSeq:
         parids=[parids]
       resultlist=merge(parent(parids[0]),comps)
     else:
       resultlist=list(comps)
-    chainmap.append(id)
+    chainmap.append(protoid)
     chains.append(resultlist)
     return resultlist
 

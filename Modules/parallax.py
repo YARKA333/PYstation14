@@ -136,7 +136,7 @@ class Background:
 class Parallax:
   def __init__(self,id):
     self.layers=[]
-    ymlayers=findproto_yml(id,"parallax")["layers"]
+    ymlayers=allprotos["parallax"][id]["layers"]
     for ymlayer in tqdm(ymlayers,desc="generating parallax... "):
       proto=default_proto.copy()
       proto.update(ymlayer)

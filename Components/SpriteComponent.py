@@ -1,6 +1,7 @@
+import Components.TransformComponent
 import Utils.events as events
 from Modules.rsi import *
-import Modules.mouseHandler as mouse
+import Modules.UInput as mouse
 from Utils.vector2 import Vector
 from Components.InteractionOutlineComponent import outline
 from colors import colors
@@ -13,15 +14,6 @@ allshades={}
 allshadebools={}
 mode="anim"
 
-#shaded=[pg.mask.Mask([512,256])]
-#shared.set("shaded_map",shaded)
-#def reset(args):shaded[0].fill()
-#events.subscribe("frame",reset)
-
-#def resize(args):
-#  shaded=[pg.mask.Mask(args["render"])]
-#  shared.set("shaded_map",shaded)
-#events.subscribe("resize",resize)
 def addshade(dst:pg.mask,src:pg.Surface,pos:list=[0,0],erase:bool=False):
   #mask=pg.mask.from_surface(src)
   if erase:
@@ -48,11 +40,11 @@ def optishade(masks:list[pg.mask.Mask],bools:list[bool])->list[pg.mask.Mask]:
 class Sprite:
   def __init__(self,entity,component):
     self.entity=entity
-    self.time=random.random()*10
+    self.time=0
     self.depth=dict.get(component,"drawdepth","Objects")
     self.uid=entity.uid
-    self.pos=entity.pos
-    self.rot=entity.rot
+    self.pos=[-20,0]
+    self.rot=0
     self.noRot=dict.get(component,"noRot")
     self.icon=dict.get(component,"sprite")
     self.visible=True
@@ -68,19 +60,18 @@ class Sprite:
       events.subscribe("updateMap",self.updateMap,entity.uid)
       events.subscribe("setDepth",self.setdepth,entity.uid)
       self.rsi=loadrsi(self.icon)
-      self.states=dict.get(component,"layers")
-      self.state=dict.get(component,"state")
-      if not self.states:
-        self.states=[{"state":self.state}]
+      self.states=dict.get(component,"layers",[component])
+      base_offset=[float(a)*32 for a in component.get("offset",'0,0').split(",")]
       self.offsets=[[float(a)*32 for a in state.get("offset",'0,0').split(",")] for state in self.states]
+      self.offsets=[[-offset[e]-base_offset[e] for e in [0,1]] for offset in self.offsets]
       for layer in self.states:
         layer.update({"shaded":False if layer.get("shader",None)=="unshaded" else True})
       self.dirs=[None]*len(self.states)
       self.cpos=[-0.5,-0.5]
       #events.subscribe(f"render:{self.depth}:{self.cpos}",self.render)
       events.followcomp("Transform",self.move,entity)
-      if mode=="stat":
-        self.calcsprites(nowarn=False)
+      #if mode=="stat":
+      self.calcsprites(nowarn=False)
     events.call("Sprite",self,self.uid)
 
   def calcsprites(self,nowarn:bool=True):
@@ -143,19 +134,19 @@ class Sprite:
       #add shadebool
       self.rotshaders.append(layer.get("shaded",True))
       #rotate and add offset
-      self.rotoffsets.append(rotate_vector(offset,self.rot))
+      self.rotoffsets.append(rotate_vector(offset,self.rot)) #debug
 
       #define new image size
       halfsize=Vector(image.get_size())/2
       edges=(halfsize*-1).pos+halfsize.pos
       offset_edges=[edges[i]+self.rotoffsets[-1][i%2] for i in range(4)]
       if self.edges==None:
-        self.edges=edges
+        self.edges=offset_edges
       else:
-        self.edges[0]=min(self.edges[0],edges[0])
-        self.edges[1]=min(self.edges[1],edges[1])
-        self.edges[2]=max(self.edges[2],edges[2])
-        self.edges[3]=max(self.edges[3],edges[3])
+        self.edges[0]=min(self.edges[0],offset_edges[0])
+        self.edges[1]=min(self.edges[1],offset_edges[1])
+        self.edges[2]=max(self.edges[2],offset_edges[2])
+        self.edges[3]=max(self.edges[3],offset_edges[3])
     if self.edges==None:self.edges=[0,0,0,0]
     self.center=[-self.edges[0],-self.edges[1]]
     self.size=[self.edges[i+2]+self.center[i] for i in [0,1]]
@@ -180,7 +171,8 @@ class Sprite:
       allshadebools.update({name:self.rotshaders})
       allshades.update({name:self.shading})
       allsprites.update({name:self.final})
-  def move(self,comp):
+  def move(self,comp:Components.TransformComponent.Transform):
+    #self.visible=comp.parent==shared.get("layerMap").uid
     self.pos=comp.pos
     cpos=[int(self.pos[i]//16) for i in [0,1]]
     if cpos!=self.cpos:
@@ -205,7 +197,6 @@ class Sprite:
 
   def setdepth(self,args):
     self.depth=args.get("depth",self.depth)
-    print(f"{self.uid} set depth to {args.get("depth")}")
     self.resub()
 
   def setlayer(self,args:dict):
@@ -222,7 +213,7 @@ class Sprite:
       self.calcsprites()
 
   def render(self,args:dict):
-    if self.pos==[0,0]:return
+    if self.pos==[0,0]:...#return
     if not self.visible:return
     dst:pg.Surface=args["dst"]
     smap:pg.Surface=args["smap"]
@@ -245,5 +236,5 @@ class Sprite:
         s,b=self.shading[i],self.rotshaders[i]
         addshade(smap,s,fpos,b)
       dst.blit(self.final,fpos)
-      mouse.check(self.final,fpos,self.uid)
+      mouse.checkMouse(self.final,fpos,self.uid)
 

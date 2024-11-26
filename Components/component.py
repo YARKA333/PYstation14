@@ -5,6 +5,7 @@ from Components.CableVisualizerComponent import CableVisualizer
 from Components.InteractionOutlineComponent import InteractionOutline
 from Components.SubFloorHideComponent import SubFloorHide
 from Components.DoorComponent import Door
+from Components.MetaDataComponent import MetaData
 from Components.OccluderComponent import Occluder
 from Components.PointLightComponent import PointLight
 

@@ -25,6 +25,18 @@ component={
   "sparksSound":{"collection":"sparks"},
 }
 
+def icon(name:str)->pg.Surface:
+  img=pg.transform.smoothscale_by(pg.image.load(name),0.5)
+  size=32
+  surf=pg.Surface((size,size),pg.SRCALPHA)
+  surf.blit(img,[(size-img.width)/2,(size-img.height)/2])
+  return surf
+icondir=joinpath(shared.get("resources"),"Textures/Interface")
+icondeny=icon(joinpath(icondir,"info.svg.192dpi.png"))
+iconemag=icon(joinpath(icondir,"VerbIcons/zap.svg.192dpi.png"))
+icotoggle=icon(joinpath(icondir,"pray.svg.png"))
+
+
 def frame(args):
   for door in active_doors:
     door.update()
@@ -47,11 +59,30 @@ class Door:
     self.uid=entity.uid
     self.partial=False
     events.followcomp("Sprite",self.Sprite,entity)
-    events.subscribe("LMB",self.activate,self.uid)
+    events.subscribe("use",self.activate,self.uid)
     events.subscribe("RMB",self.emag,self.uid)
     events.subscribe("MMB",self.deny,self.uid)
+    events.subscribe("getVerbs",self.getVerbs,self.uid)
     self.nextTime=None
     self.appear()
+  def getVerbs(self,args):
+    print("ae")
+    return [{
+      "name":"Toggle",
+      "priority":10,
+      "img":icotoggle,
+      "click":self.activate,
+      },{
+      "name":"Trigger deny",
+      "priority":10,
+      "img":icondeny,
+      "click":self.deny,
+      },{
+      "name":"Trigger emag",
+      "priority":10,
+      "img":iconemag,
+      "click":self.emag,
+      }]
   def setstate(self,state):
     self.comp["state"]=state
     self.appear()

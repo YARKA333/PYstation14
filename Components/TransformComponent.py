@@ -3,31 +3,39 @@ import Utils.shared as shared
 from Modules.rsi import *
 
 class Transform:
-  def __init__(self,entity,component):
+  def __init__(self,entity,component:dict):
     self.uid=entity.uid
     result={}
-    pos=dict.get(component,"pos",None)
-    rot=dict.get(component,"rot",None)
+    pos=component.get("pos",None)
+    rot=component.get("rot",None)
+    anc=component.get("anchored",False)
+    self.parent=int(component.get("parent",0))
+    self.maingrid=shared.get("layerMap").uid==self.parent
+    self.maingrid=True
+    if not self.maingrid:pos=[666,666]
     #anc=dict.get(component,"anchored",None)
-    anc=1
-    if pos!=None:
+    if type(pos)==list:
+      self.pos=pos
+      component.update({"pos":self.pos})
+    elif pos!=None:
       self.pos=[float(a) for a in pos.split(",")]
-      entity.__setattr__("pos",self.pos)
       component.update({"pos":self.pos})
     else:
+      print("lox")
       self.pos=[0,0]
     if anc!=None:
       self.anchor=1
-      grid=shared.get("globalgrid")
-      grid.add(str(self.pos),self.uid)
+      if self.maingrid:
+        grid=shared.get("globalgrid")
+        grid.add(str(self.pos),self.uid)
       #shared.set(grid)
     else:
       self.anchor=0
     if rot!=None:
       self.rot=angle(rot)
-      entity.__setattr__("rot",self.rot)
       component.update({"rot":self.rot})
     else:
       self.rot=0
-    events.call("Transform",self,self.uid)
+    if self.maingrid:
+      events.call("Transform",self,self.uid)
 
