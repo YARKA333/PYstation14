@@ -6,7 +6,7 @@ SS14 на Python!
 
 в папке содержатся:
 
-Textures, Prototypes, Audios, Maps
+Textures, Prototypes, Audio, Maps
 
 Можно скачать отсюда: https://github.com/YARKA333/corvax-2
 
