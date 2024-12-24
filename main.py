@@ -191,7 +191,7 @@ def run():
       if event.type==pg.KEYDOWN:
         if event.key==pg.K_l:
           lmode=(lmode+1)%3
-        if event.key==pg.K_F5:
+          lmode=(lmode+1)%4
           UInput.spawn.start()
       if event.type==pg.MOUSEWHEEL:
         events.call("scroll",{"delta":event.y})

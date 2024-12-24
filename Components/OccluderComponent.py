@@ -1,10 +1,14 @@
 import math
-
+from colors import colors
 import pygame as pg
 import Utils.shared as shared
 import Utils.events as events
+import random
 from tqdm import tqdm
 #from Modules.rsi import findcolor
+
+#lightchunks={}
+lightkake={}
 
 def hextorgb(hex:str,nowarn=False)->list:
   """Converts hex color string to rgb(a) format
@@ -119,7 +123,7 @@ def iss(A,B,rect):#Written by Qwen2.5-72B-Instruct, not yarka
 
 size=64
 
-def draw(surf,pos,objs,color=[0,0,0],simple=False):
+def draw(surf,pos,objs,color=(0,0,0),simple=False):
   WIDTH,HEIGHT=surf.get_size()
   hwidth,hheight=WIDTH/2,HEIGHT/2
   sx,sy=pos
@@ -166,7 +170,7 @@ def draw(surf,pos,objs,color=[0,0,0],simple=False):
         #pg.draw.line(surf,[255,255,255],[c,x1+8],[c+8,x1+8])
         lef=not [n-1,v] in objs and sx<x1
         rig=not [n+1,v] in objs and sx>x2
-      elif set==3:
+      else:
         vis=sx>c
         beh=[v-1,n] in objs
         #pg.draw.line(surf,[255,255,255],[c,x1+8],[c+8,x1+8])
@@ -212,7 +216,13 @@ def sigma(D,M):
   return 1/(1+math.exp((D-M)/(M/10)))
 
 def falloff(x):
-  return -0.5*(math.cos(math.pi*x)-1)
+  return x
+  #return -0.5*(math.cos(math.pi*x)-1)
+
+def randcirc():
+  while 1:
+    pos=(random.random()*2-1,random.random()*2-1)
+    if math.hypot(abs(pos[0]),abs(pos[1]))<=1:return pos
 
 
 class Occluder:
@@ -255,91 +265,105 @@ class FOV:
       self.updateLight(args)
   def UpdateLights(self,args):
     rect=args.get("rect",None) if args else None
-    for l in self.lightsarray:
+    for l in tqdm(self.lightsarray,desc="Calculating light"):
       self.updateLight(l,rect)
   def updateLight(self,l,rect:pg.Rect|None=None):
+    global lightkake
     if (rect and "rect" in l.keys() and not
        rect.colliderect(l["rect"])):return
     gpos=l["gpos"]
     l.update({"pos":[gpos[0],1-gpos[1]]})
-    fcolor=findcolor(l["color"])
+    rfcolor=findcolor(l["color"])
+    smooth=l.get("softness",0)*4
     energy=l["energy"]
-    l.update({"fcolor":[min(fcolor[i]*energy,255) for i in [0,1,2]]})
+    shadow=l.get("castShadows",True)
+    if smooth:
+      energy/=10
+    fcolor=[min(rfcolor[i]*energy,255) for i in [0,1,2]]
+    l.update({"fcolor":fcolor})
     R=l["radius"]
-    power=R*64
-    s1=pg.Surface([power*2]*2)
-    s1.fill([0,0,0])
-    for i in range(100):
-      pg.draw.circle(s1,[int(lerp(0,l["fcolor"][e],falloff(i/100))) for e in range(3)],[power,power],
-                     power*(1-i/100))
-    s2=pg.Surface([power*2]*2)
-    s2.fill([255,255,255])
-    draw(s2,[l["pos"][0]*size,l["pos"][1]*size],self.objects,simple=True)
-    s1.blit(s2,[0,0],special_flags=pg.BLEND_RGB_MULT)
     l.update({"rect":pg.Rect(gpos[0]-R,gpos[1]-R,2*R,2*R)})
-    l.update({"img":s1})
+    power=R*64
+    kakename=f"{power},{rfcolor}"
+    if kakename in lightkake:
+      s1=lightkake[kakename]
+    else:
+      s1=pg.Surface([power*2]*2)
+      s1.fill([0,0,0])
+      for i in range(100):
+        color=[int(lerp(0,l["fcolor"][e],falloff(i/100))) for e in range(3)]
+        pg.draw.circle(s1,color,[power,power],power*(1-i/100))
+
+      lightkake[kakename]=s1
+
+    if smooth:
+      s3=pg.Surface([(power+smooth)*2]*2)
+      a=[]
+      for i in range(10):
+        s2=s1.copy()
+        rpos=randcirc()
+        rpos=[rpos[e]*smooth for e in [0,1]]
+        if shadow:
+          draw(s2,[l["pos"][0]*size+rpos[0],l["pos"][1]*size+rpos[1]],self.objects,simple=True)
+        a.append((s2,[rpos[e]+smooth for e in [0,1]]))
+      s3.fblits(a,pg.BLEND_ADD)
+    else:
+      s3=s1.copy()
+      if shadow:
+        draw(s3,[l["pos"][0]*size,l["pos"][1]*size],self.objects,simple=True)
+    l.update({"img":pg.transform.invert(s3)})
+
   def draw(self,surf,pos,mode,mask=None):
     #draw(surf,pos,self.lines,self.objects)
     if mode:
       easy(surf,pos,self.objects,self.lightsarray,mode,mask)
 
-def calclights(lightarray,objs):
-  for l in lightarray:
-    gpos=l["gpos"]
-    l.update({"pos":[gpos[0],1-gpos[1]]})
-    fcolor=findcolor(l["color"])
-    energy=l["energy"]/2
-    l.update({"fcolor":[min(fcolor[i]*energy,255) for i in [0,1,2]]})
-    power=l["radius"]/100*64
-    s1=pg.Surface([power*200]*2)
-    s1.fill([0,0,0])
-    for i in range(100):
-      pg.draw.circle(s1,[int(lerp(0,l["fcolor"][e],i/100)) for e in range(3)],
-                     [power*100,power*100],power*(100-i))
-    s2=pg.Surface([power*200]*2)
-    s2.fill([255,255,255])
-    draw(s2,[l["pos"][0]*size+1,l["pos"][1]*size],objs,simple=True)
-    s1.blit(s2,[0,0],special_flags=pg.BLEND_RGB_MULT)
-    l.update({"img":s1})
-
 def easy(screen,pos,objs,lights,mode,mask=None):
   sx,sy=pos
   WIDTH,HEIGHT=screen.size
+  nx,ny=sx-WIDTH/2,sy-HEIGHT/2
+  if mode==3:
+    screen.fill([255,255,255])
   wallsurf=pg.Surface([WIDTH,HEIGHT],pg.SRCALPHA)
   wallsurf.fill([0,0,0,0])
   wallsurf3=pg.Surface([WIDTH,HEIGHT])
   wallsurf3.fill([255,255,255])
   #wallsurf2.set_colorkey([0,0,0])
   for obj in objs:
-    pos=[WIDTH/2+obj[0]*size-sx,HEIGHT/2+obj[1]*size-sy,size,size]
+    pos=[obj[0]*size-nx,obj[1]*size-ny,size,size]
     if pos[0]+size<0 or pos[1]+size<0:continue
     if pos[0]>WIDTH or pos[1]>HEIGHT:continue
     pg.draw.rect(wallsurf,[255,255,255,255],pos)
     pg.draw.rect(wallsurf3,[0,0,0],pos)
   s3=pg.Surface([WIDTH,HEIGHT])
-  s3.fill([5,5,5])
+  s3.fill([255,255,255])
   lightimgs=[]
   for l in lights:
-    power=l["radius"]*64
-    pos=[WIDTH/2-sx-power+l["pos"][0]*size,HEIGHT/2-sy-power+l["pos"][1]*size]
-    if pos[0]+2*power<0 or pos[1]+2*power<0:continue
+    img:pg.Surface=l["img"]
+    radius=img.width/2
+    pos=[-nx-radius+l["pos"][0]*size,-ny-radius+l["pos"][1]*size]
+    if pos[0]+2*radius<0 or pos[1]+2*radius<0:continue
     if pos[0]>WIDTH or pos[1]>HEIGHT:continue
-    lightimgs.append((l["img"],pos))
-  s3.fblits(lightimgs,pg.BLEND_RGB_ADD)
+    lightimgs.append((img,pos))
+
+  s3.fblits(lightimgs,pg.BLEND_MULT)
+  s3=pg.transform.invert(s3)
+
   #wallsurf.convert_alpha()
   if mode==2:
     draw(s3,[sx,sy],objs,simple=True)
-  s35=s3.copy().convert_alpha()
-  s3.blit(wallsurf,[0,0])
-  #blank.blit(s3,[0,0],special_flags=pg.BLEND_RGB_MULT)#
-  s35.blit(wallsurf,[0,0],special_flags=pg.BLEND_RGBA_SUB)
-  #draw(s35,[sx,sy],lines,objs,simple=True)
-  s4=pg.transform.box_blur(s35,64)
-  s4.blit(s4,[0,0],special_flags=pg.BLEND_ADD)
-  #s4=s3
-  #wallsurf2.blit(s4,[0,0],special_flags=pg.BLEND_RGB_MULT)
-  s4.blit(wallsurf3,[0,0],special_flags=pg.BLEND_RGB_MAX)
-  s3.blit(s4,[0,0],special_flags=pg.BLEND_MULT)
+  if "f"==5:
+    s35=s3.copy().convert_alpha()
+    s3.blit(wallsurf,[0,0])
+      #blank.blit(s3,[0,0],special_flags=pg.BLEND_RGB_MULT)#
+    s35.blit(wallsurf,[0,0],special_flags=pg.BLEND_RGBA_SUB)
+      #draw(s35,[sx,sy],lines,objs,simple=True)
+    s4=pg.transform.box_blur(s35,64)
+    s4.blit(s4,[0,0],special_flags=pg.BLEND_ADD)
+      #s4=s3
+      #wallsurf2.blit(s4,[0,0],special_flags=pg.BLEND_RGB_MULT)
+    s4.blit(wallsurf3,[0,0],special_flags=pg.BLEND_RGB_MAX)
+    s3.blit(s4,[0,0],special_flags=pg.BLEND_MULT)
   if mask:
     s3.blit(mask.to_surface(),[0,0],special_flags=pg.BLEND_MAX)
   if mode==2:
@@ -348,76 +372,3 @@ def easy(screen,pos,objs,lights,mode,mask=None):
   #for l in lights:
   #  pg.draw.circle(screen,[255,0,0],[WIDTH/2-sx+l["pos"][0]*size,HEIGHT/2-sy+l["pos"][1]*size],5)
   return screen
-
-
-if __name__=="__main__":
-  # Инициализация Pygame
-  pg.init()
-
-  # Размеры окна
-  WIDTH=640
-  HEIGHT=480
-  screen=pg.display.set_mode((WIDTH,HEIGHT),pg.RESIZABLE)
-  sx,sy=288,96
-
-
-  grid=[
-    [1,1,1,1,1,1,1,0,0,0,0,0],
-    [1,0,0,0,0,0,0,0,0,0,0,0],
-    [1,0,1,1,1,1,0,0,0,0,1,0],
-    [1,0,1,0,0,1,0,0,0,1,1,1],
-    [1,0,1,0,0,1,0,0,0,0,1,0],
-    [1,0,1,0,0,1,0,0,0,0,0,0],
-    [1,0,0,0,0,0,0,0,0,0,0,0],
-    [1,1,1,1,1,1,1,0,0,0,0,0],
-  ]
-  objarray=[
-  [0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0],
-  [0, 1], [0, 2], [2, 2], [3, 2], [4, 2], [5, 2], [10, 2],
-  [0, 3], [2, 3], [5, 3], [9, 3], [10, 3], [11, 3], [0, 4],
-  [2, 4], [5, 4], [10, 4], [0, 5], [2, 5], [5, 5], [0, 6],
-  [0, 7], [1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6.5, 7]
-  ]
-  lightarray=[{"gpos":[4,-4.1],"color":[255,220,160],"energy":1,"radius":5},
-              {"gpos":[8,-4.1],"color":[255,0,0],"energy":1,"radius":5},
-              {"gpos":[4.5,-0.5],"color":[0,255,0],"energy":1,"radius":5},
-              {"gpos":[1.5,-3],"color":[0,0,255],"energy":1,"radius":5}]
-
-
-
-
-  speed=10
-  lit_color=[255,220,160]
-  unlit_color=[10,20,30]
-  unlit_color=[0,0,0]
-
-  calclights(lightarray,objarray)
-
-  # Цикл игры
-  while True:
-    for event in pg.event.get():
-      if event.type == pg.QUIT:
-        pg.quit()
-        1/0
-      if event.type==pg.VIDEORESIZE:
-        WIDTH,HEIGHT=event.w,event.h
-        pg.display.set_mode([WIDTH,HEIGHT],pg.RESIZABLE)
-    key=pg.key.get_pressed()
-    if key:
-      if key[pg.key.key_code("w")]: sy-=speed
-      if key[pg.key.key_code("a")]: sx-=speed
-      if key[pg.key.key_code("s")]: sy+=speed
-      if key[pg.key.key_code("d")]: sx+=speed
-    screen.fill((255,255,255))
-    #lightarray[4].update({"pos":[sx/size,sy/size]})
-    #for y in range(len(grid)):
-    #  for x in range(len(grid[0])):
-    #    if grid[y][x]:
-    #      pg.draw.rect(screen,[150,150,150],[WIDTH/2+x*size-sx,HEIGHT/2+y*size-sy,size,size])
-
-    easy(screen,[sx,sy],objarray,lightarray)
-    pg.draw.circle(screen,[255,0,0],[WIDTH/2,HEIGHT/2],5)
-
-    # Обновление экрана
-    pg.display.flip()
-    pg.time.Clock().tick(60)
