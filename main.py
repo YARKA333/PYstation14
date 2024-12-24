@@ -190,9 +190,18 @@ def run():
         events.call("resize",{"real":[WIDTH,HEIGHT],"render":[WIDTH/2,HEIGHT/2]})
       if event.type==pg.KEYDOWN:
         if event.key==pg.K_l:
-          lmode=(lmode+1)%3
           lmode=(lmode+1)%4
+        elif event.key==pg.K_k:
+          events.call("spawn_ball",{"gpos":[sx,sy],"dpos":[px,py]})
+        elif event.key==pg.K_F5:
           UInput.spawn.start()
+        elif event.key==pg.K_g:
+          events.call("mousegrib")
+        elif event.key==pg.K_c:
+          events.call("toggle collision debug")
+      if event.type==pg.KEYUP:
+        if event.key==pg.K_g:
+          events.call("mouseungrib")
       if event.type==pg.MOUSEWHEEL:
         events.call("scroll",{"delta":event.y})
     key=pg.key.get_pressed()

@@ -1,7 +1,7 @@
 import Utils.events as events
 import Utils.shared as shared
 from Modules.rsi import *
-
+import math
 class Transform:
   def __init__(self,entity,component:dict):
     self.uid=entity.uid
@@ -9,6 +9,7 @@ class Transform:
     pos=component.get("pos",None)
     rot=component.get("rot",None)
     anc=component.get("anchored",False)
+    events.subscribe("teleport",self.replace,self.uid)
     self.parent=int(component.get("parent",0))
     self.maingrid=shared.get("layerMap").uid==self.parent
     self.maingrid=True
@@ -21,7 +22,7 @@ class Transform:
       self.pos=[float(a) for a in pos.split(",")]
       component.update({"pos":self.pos})
     else:
-      print("lox")
+      print("no position for object",self.uid)
       self.pos=[0,0]
     if anc!=None:
       self.anchor=1
@@ -39,3 +40,27 @@ class Transform:
     if self.maingrid:
       events.call("Transform",self,self.uid)
 
+  def replace(self,args):
+    anc=args.get("anc")
+    if not anc is None:
+      self.anchor=anc
+    pos=args.get("pos")
+    if not pos is None:
+      pos=list(pos)
+      if math.isnan(pos[0]) or math.isnan(pos[1]):
+        pass
+        #self.pos=[0,0]
+      else:
+        self.pos=list(pos)
+    rot=args.get("rot")
+    if not rot is None:
+      rot=float(rot)
+      if math.isnan(rot):
+        pass
+        #self.rot=0
+      else:
+        self.rot=rot
+    par=args.get("par")
+    if not par is None:
+      self.parent=par
+    events.call("Transform",self,self.uid)

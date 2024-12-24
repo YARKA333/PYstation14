@@ -8,6 +8,7 @@ from Components.DoorComponent import Door
 from Components.MetaDataComponent import MetaData
 from Components.OccluderComponent import Occluder
 from Components.PointLightComponent import PointLight
+from Components.PhysicsComponent import Fixtures,Physics
 from Components.AppearanceComponent import Appearance,GenericVisualizer
 from Components.ComputerComponent import Computer
 
