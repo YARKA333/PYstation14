@@ -42,15 +42,14 @@ def parent(protoid:str)->list:
     parids=proto.get("parent")
     comps=proto.get("components",[])
     if parids:
-      if type(parids)!=ruamel.yaml.CommentedSeq:
+      if isinstance(parids,str):
         parids=[parids]
-      resultlist=merge(parent(parids[0]),comps)
-    else:
-      resultlist=list(comps)
+      for parid in parids:
+        comps=merge(parent(parid),comps)
     chainmap.append(protoid)
-    chains.append(resultlist)
-    return resultlist
+    chains.append(list(comps))
+    return list(comps)
 
-
-#print("\n".join([str(a) for a in parent("CEPDA")]))
+if __name__=="__main__":
+  print("\n".join([str(a) for a in parent("GasVentScrubber")]))
 

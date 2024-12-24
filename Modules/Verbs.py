@@ -1,10 +1,21 @@
 import Utils.events as events
 import Modules.entityModule as eMod
 import pygame as pg
+from Modules.rsi import joinpath
+import Utils.shared as shared
+
+icondir=joinpath(shared.get("resources"),"Textures/Interface")
 def icon(name:str)->pg.Surface:
-  return pg.transform.smoothscale_by(pg.image.load(name),0.5)
-img_examine=icon("C:/Servers/SS14 c2/Resources/Textures/Interface/VerbIcons/examine.svg.192dpi.png")
-img_delete=icon("C:/Servers/SS14 c2/Resources/Textures/Interface/VerbIcons/delete.svg.192dpi.png")
+  name=joinpath(icondir,name)
+  img=pg.transform.smoothscale_by(pg.image.load(name),0.5)
+  size=32
+  surf=pg.Surface((size,size),pg.SRCALPHA)
+  surf.blit(img,[(size-img.width)/2,(size-img.height)/2])
+  return surf
+
+img_examine=icon("VerbIcons/examine.svg.192dpi.png")
+img_delete=icon("VerbIcons/delete.svg.192dpi.png")
+
 
 def Examine(uid):
   print(eMod.getEcomp(uid,"MetaData").desc)

@@ -19,16 +19,18 @@ class Entity:
     comps={}
     self.components={}
     self.meta={"No":"pe"}
+    if components:
+      comps=typemerge(comps,parents.typedict(components))
     if proto:
-      comps=typemerge(comps,parents.typedict(parents.parent(proto)))
+      comps=typemerge(parents.typedict(parents.parent(proto)),comps)
       self.meta={"MetaData":{
         "type":"MetaData",
         "proto":proto,
-      }}
+        "comps":comps,
+        }}
       comps.update(self.meta)
 
-    if components:
-      comps=typemerge(comps,parents.typedict(components))
+
     for name,comp in comps.items():
       compclass=component.getcomponent(name)
       if compclass:

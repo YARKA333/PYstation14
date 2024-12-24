@@ -8,6 +8,7 @@ import time
 import Modules.Verbs as Verbs
 import Modules.entityModule as eMod
 import Utils.shared as shared
+import Utils.events as events
 
 resources=shared.get("resources")
 
@@ -42,6 +43,13 @@ more_arrow_name=rsi.joinpath(resources,"Textures/Interface/VerbIcons/group.svg.1
 more_arrow=pg.Surface([32,32],pg.SRCALPHA)
 more_arrow.blit(pg.transform.smoothscale_by(pg.image.load(more_arrow_name),0.5),[8,8])
 
+#scroll
+delta=0
+
+def scroll(args):
+  global delta
+  delta+=args.get("delta",0)
+events.subscribe("scroll",scroll)
 
 def remspace(txt:str):
   while 1:
@@ -152,6 +160,7 @@ class ContextMenu:
       item["fall"]=summ
       summ+=item["height"]+4
   def render(self,surf:pg.Surface,active=True):
+    global delta
     windowRect=pg.Rect(self.pos[0],self.pos[1],self.twidth,self.height)
     pg.draw.rect(surf,border1_color,windowRect)
     surf.blit(self.subsurf,[self.pos[0]+2,self.pos[1]+2],[0,self.total_scroll,self.twidth-4,self.height-4])
@@ -192,7 +201,7 @@ class ContextMenu:
       self.timer=None
       self.stableHovered=hovered
       if hovered!=None:
-        menu1=ContextMenu({"uid":uid,"pos":[self.pos[0]+self.twidth,self.pos[1]+element["fall"]]})
+        menu1=ContextMenu({"uid":uid,"pos":[self.pos[0]+self.twidth,self.pos[1]+element["fall"]-self.total_scroll]})
         menu1.elements=element["hover"](uid)
         menu1.calculate()
         self.child=menu1
@@ -212,10 +221,13 @@ class ContextMenu:
           self.scroll=pg.math.clamp((mouse_pos[1]-self.mouse),0,prop)
         else:
           self.mouse=None
+      if active:
+        self.scroll_queue=delta
       self.scroll=pg.math.clamp(self.scroll+self.scroll_queue*prop/(self.total_height-self.height)*-50,0,prop)
       self.scroll_queue=0
       self.total_scroll=self.scroll/prop*(self.total_height-self.height)
       pg.draw.rect(surf,scroll_colors[hover],scrollRect)
+
     self.pressed=pressed
     if updated:self.cook()
     iscursor=bool(hovered!=None or hover)
@@ -224,10 +236,9 @@ class ContextMenu:
       self.childActive=bool(cout[0])
       active+=cout[0]
       iscursor+=cout[1]
+    else:
+      delta=0
     return active,iscursor
-
-  def mscr(self,direcrtion):
-    self.scroll_queue+=direcrtion
 
 class ExaMenu:
   def __init__(self,args):
@@ -241,23 +252,25 @@ class ExaMenu:
     surf
 
 
-def getimg(ind,i=False):
-  global rimages
-  while not ind in rimages:
-    path=random.choice(namespace)
-    if i and not "Interface/VerbIcons" in path:continue
-    rimg=pg.image.load(path)
-    if rimg.get_size()==(32,32):
-      rimages[ind]=rimg
-    elif i and rimg.get_size()==(64,64):
-      rimg2=pg.transform.smoothscale_by(rimg,0.5)
-      rimages[ind]=rimg2
-  return rimages[ind]
+
 
 if __name__=="__main__":
   screen=pg.display.set_mode((1000,1000))
   pg.init()
 
+
+  def getimg(ind,i=False):
+    global rimages
+    while not ind in rimages:
+      path=random.choice(namespace)
+      if i and not "Interface/VerbIcons" in path: continue
+      rimg=pg.image.load(path)
+      if rimg.get_size()==(32,32):
+        rimages[ind]=rimg
+      elif i and rimg.get_size()==(64,64):
+        rimg2=pg.transform.smoothscale_by(rimg,0.5)
+        rimages[ind]=rimg2
+    return rimages[ind]
 
   namespace=rsi.namelist("C:/Servers/SS14 c2/Resources/Textures",full=True)
   i=0

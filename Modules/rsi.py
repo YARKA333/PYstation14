@@ -141,39 +141,7 @@ def yml(path,raw=False):
       return yaml.load(openfile(path))
   except Exception as error:print(f'{error} \nError when opening {path} in {raw and "raw" or "auto"} mode')
 
-class Floor:
-  def __init__(self,id:str="Space",source:os.PathLike="default"):
-    try:
-      id=mig[id]["target"]
-    except:pass
-    try:
-      tile=tiles[id]
-    except:
-      print("No tile with id:"+id+"\nReplaced with Space")
-      #tile=next((item for item in tiles if item["id"]=="Space"),None)
-      tile=tiles["Space"]
-    for k,v in tile.items():
-      setattr(self,k,v)
-    if hasattr(self,"sprite"):
-      self.image=pg.image.load(openfile(self.sprite))
-      surf=pg.Surface([32]*2,pg.SRCALPHA)
-      self.images=[]
-      if not hasattr(self,"variants"):
-        self.variants=1
-        self.placementVariants=[1]
-      for i in range(self.variants):
-        surf.blit(self.image,[-32*i,0])
-        self.images.append(surf.copy())
-    else:self.sprite=False
 
-  def __call__(self,variant=None):
-    if self.sprite:
-      if variant==None:
-        return random.choices(self.images,weights=self.placementVariants)[0]
-      else:
-        assert variant<self.variants
-        return self.images[variant]
-    else: return False
 
 class Decal:
   def __init__(self,data):
@@ -300,19 +268,20 @@ def findproto(id,list:list):
 
 allprotos={}
 allp={}
-mig={}
-tiles={}
 decal_protos={}
 decal_rsi={}
 
 def load_protos():
-  global allprotos,allp,mig,tiles,decal_protos
+  global allprotos,allp,tiles,decal_protos
+  ...
+if True:
   print("loading protos")
-  with open("kake/prototypes.pk","rb") as file:
-    allprotos|=pickle.load(file)
+  #with open("kake/prototypes.pk","rb") as file:
+  #  allprotos|=pickle.load(file)
+  with open("protrotypes.json","rb") as f:
+    allprotos|=json.load(f)
+
   allp|=allprotos["entity"]
-  mig|=allprotos["tileAlias"]
-  tiles|=allprotos["tile"]
   decal_protos|=allprotos["decal"]
   print("loaded",len(allp),"protos")
   print()
@@ -337,3 +306,20 @@ def rotate_vector(vector:list[float,float],angle:float):
     vector[0]*math.cos(angle_rad)-vector[1]*math.sin(angle_rad),
     vector[0]*math.sin(angle_rad)+vector[1]*math.cos(angle_rad)]
 
+def resolve(string:str):
+  try:
+    return int(string)
+  except:...
+  try:
+    return float(string)
+  except:...
+  try:
+    bunch=string.split(",")
+    assert isinstance(bunch,list) and len(bunch)>1
+    r=[]
+    print(bunch)
+    for elem in bunch:
+      r.append(resolve(elem))
+    return r
+  except:...
+  return string

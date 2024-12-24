@@ -10,6 +10,7 @@ class Spawn:
   def __init__(self):
     self.spawning=None
   def start(self):
+    global windows
     proto=tk.askstring("Spawn","Enter prototype ID:")
     if not proto in allp.keys():
       print(f"No proto \"{proto}\"")

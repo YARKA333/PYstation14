@@ -41,7 +41,7 @@ load_protos()
 WIDTH,HEIGHT=1024,512
 screen=pg.display.set_mode([WIDTH,HEIGHT],pg.RESIZABLE)
 pg.display.set_caption("PyStation 14")
-pg.display.set_icon(pg.image.load("icon.png"))
+pg.display.set_icon(pg.image.load(joinpath(ss14_folder,"Textures/Logo/icon/icon-256x256.png")))
 disp=pg.Surface((WIDTH/2,HEIGHT/2))
 smap=pg.mask.Mask((WIDTH/2,HEIGHT/2))
 
@@ -130,9 +130,10 @@ for c in grid:
   surf.fill([0,0,0,0])
   for x in range(16):
     for y in range(16):
-      tile=map_inst.tiledict[map.decode(c[y][x])]
+      num,var=map.decode(c[y][x])
+      tile=map_inst.tiledict[num]
       if tile.sprite:
-        surf.blit(tile(),[32*x,32*(15-y)])
+        surf.blit(tile(var),[32*x,32*(15-y)])
   chunks.append(surf.copy())
 
 for dec in decals:
@@ -169,7 +170,7 @@ def run():
     fov.draw(screen,[px*2,-py*2],mode=lmode,mask=smap.scale((WIDTH,HEIGHT)))
     screen.blit(font.render(str(hover),True,[255,0,0]),[10,10])
     name="None"
-    events.call("overlay",{"surf":screen})
+    events.call("overlay",{"surf":screen,"dpos":[px,py],"gpos":[sx,sy]})
     if hover in uids:
       comp=entityModule.getEcomp(hover,"MetaData")
       if comp:
@@ -192,6 +193,8 @@ def run():
           lmode=(lmode+1)%3
         if event.key==pg.K_F5:
           UInput.spawn.start()
+      if event.type==pg.MOUSEWHEEL:
+        events.call("scroll",{"delta":event.y})
     key=pg.key.get_pressed()
     if key:
       if key[pg.key.key_code("w")]: sy+=speed

@@ -1,6 +1,8 @@
 #from enum import Enum
+import Components.SpriteComponent
 import Utils.events as events
 import time
+import Modules.Verbs as verbs
 import pygame as pg
 from Modules.soundModule import *
 #DoorStates=Enum("DoorStates",["Open","closing","Closed","Opening","Welded","Denying","Emagging"])
@@ -25,29 +27,15 @@ component={
   "sparksSound":{"collection":"sparks"},
 }
 
-def icon(name:str)->pg.Surface:
-  img=pg.transform.smoothscale_by(pg.image.load(name),0.5)
-  size=32
-  surf=pg.Surface((size,size),pg.SRCALPHA)
-  surf.blit(img,[(size-img.width)/2,(size-img.height)/2])
-  return surf
-icondir=joinpath(shared.get("resources"),"Textures/Interface")
-icondeny=icon(joinpath(icondir,"info.svg.192dpi.png"))
-iconemag=icon(joinpath(icondir,"VerbIcons/zap.svg.192dpi.png"))
-icotoggle=icon(joinpath(icondir,"pray.svg.png"))
+icondeny=verbs.icon("info.svg.192dpi.png")
+iconemag=verbs.icon("VerbIcons/zap.svg.192dpi.png")
+icotoggle=verbs.icon("pray.svg.png")
 
 
 def frame(args):
   for door in active_doors:
     door.update()
 events.subscribe("frame",frame)
-
-def trygetsound(name):
-  sound=args.get(name)
-  if name:
-    return getsound(openSound["path"])
-  else:
-    return getsound("/Audio/Effects/explosion1.ogg")
 
 
 
@@ -58,6 +46,7 @@ class Door:
     self.comp.update(args)
     self.uid=entity.uid
     self.partial=False
+    self.sprite:Components.SpriteComponent.Sprite=None
     events.followcomp("Sprite",self.Sprite,entity)
     events.subscribe("use",self.activate,self.uid)
     events.subscribe("RMB",self.emag,self.uid)
@@ -144,6 +133,7 @@ class Door:
           events.call("setDepth",{"depth":self.comp["openDrawDepth"]},self.uid)
           self.nextTime=time.time()+self.comp["openingTimeTwo"]
           events.call("setOccluder",{"enabled":False},self.uid)
+          events.call("Set_collidable",{"state":False},self.uid)
       elif self.comp["state"]=="Closing":
         if self.partial:
           self.partial=False
@@ -154,12 +144,14 @@ class Door:
           events.call("setDepth",{"depth":self.comp["closedDrawDepth"]},self.uid)
           self.nextTime=time.time()+self.comp["closingTimeTwo"]
           events.call("setOccluder",{"enabled":self.comp["occludes"]},self.uid)
+          events.call("Set_collidable",{"state":True},self.uid)
       elif self.comp["state"]=="Emagging":
         self.setstate("Closed")
         self.activate(None)
       elif self.comp["state"]=="Denying":
         self.setstate("Closed")
   def Sprite(self,args):
+    self.sprite=args
     events.call("updateMap",{
       "enum.DoorVisualLayers.Base":True,
       "enum.DoorVisualLayers.BaseUnlit":True,

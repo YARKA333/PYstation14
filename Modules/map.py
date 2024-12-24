@@ -1,4 +1,5 @@
 from Modules.rsi import *
+from Modules.Tiles import Floor
 from tqdm import tqdm
 from Utils.parents import typedict
 import pickle
@@ -20,8 +21,8 @@ def decode(code:str)->int|None:
   """scary letters to numbers"""
   a=alpha.index(code[0])*4
   if code[1] in beta:
-    return a+beta.index(code[1])
-  return None
+    return a+beta.index(code[1]),alpha.index(code[5])
+  return None,None
 
 def loadmap(mapid):
     mapPath:str=allprotos["gameMap"][mapid]["mapPath"]
@@ -76,5 +77,5 @@ class Grid:
     if not chunk:
       num=0
     else:
-      num=decode(chunk[int(pos[1])%16][int(pos[0])%16])
+      num,var=decode(chunk[int(pos[1])%16][int(pos[0])%16])
     return self.tiledict[num]
