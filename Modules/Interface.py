@@ -45,6 +45,7 @@ more_arrow.blit(pg.transform.smoothscale_by(pg.image.load(more_arrow_name),0.5),
 
 #scroll
 delta=0
+SCROLL_SPEED=0.2
 
 def scroll(args):
   global delta
@@ -103,15 +104,16 @@ class ContextMenu:
     self.uid=args.get("uid")
     self.name=args.get("name","DefaultStupidName")
     self.type=args.get("type","Custom")
-    self.scroll_queue=0
     self.elements=[]
     self.hovered=None
     self.pressed=False
     self.timer=None
     self.scroll=None
+    self.target=0
     self.child=None
     self.childActive=False
     self.stableHovered=None
+    self.max_height=min(364,pg.display.get_window_size()[1]-self.pos[1])
   def addelement(self,element):
     self.elements.append(element)
   def calculate(self):
@@ -132,9 +134,9 @@ class ContextMenu:
         32,
         hv)
     self.total_height=sum([a["height"]+4 for a in self.elements])+4
-    self.height=min(self.total_height,364)
+    self.height=min(self.total_height,self.max_height)
     self.twidth=self.width
-    if self.total_height>364:
+    if self.total_height>self.max_height:
       self.scroll=0
 
       self.twidth+=10
@@ -219,12 +221,15 @@ class ContextMenu:
           if self.mouse==None:
             self.mouse=mouse_pos[1]-self.scroll
           self.scroll=pg.math.clamp((mouse_pos[1]-self.mouse),0,prop)
+          self.target=self.scroll
         else:
           self.mouse=None
-      if active:
-        self.scroll_queue=delta
-      self.scroll=pg.math.clamp(self.scroll+self.scroll_queue*prop/(self.total_height-self.height)*-50,0,prop)
-      self.scroll_queue=0
+      if active and delta:
+        self.target=pg.math.clamp(self.scroll-delta*prop*0.5,0,prop)
+        #print(delta*prop*50)
+      #print((self.target-self.scroll)*SCROLL_SPEED)
+      #print(self.scroll)
+      self.scroll+=(self.target-self.scroll)*SCROLL_SPEED
       self.total_scroll=self.scroll/prop*(self.total_height-self.height)
       pg.draw.rect(surf,scroll_colors[hover],scrollRect)
 
@@ -244,12 +249,12 @@ class ExaMenu:
   def __init__(self,args):
     self.pos=args["pos"]
     self.uid=args.get("uid")
-    calculate()
+    self.calculate()
   def calculate(self):
     meta:Components.MetaDataComponent.MetaData=eMod.getEcomp(self.uid,"MetaData")
     lines=wrap_text(meta.desc,274)
     title_lines=wrap_text(f"{meta.name} ({meta.proto})",278)
-    surf
+    #surf
 
 
 

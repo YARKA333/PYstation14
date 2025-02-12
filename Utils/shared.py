@@ -11,3 +11,12 @@ def get(var):
 def delete(var):
   if var in shared.keys():
     return shared.pop(var)
+
+def __getattr__(name):
+  return get(name)
+def __setattr__(name,value):
+  set(name,value)
+def __getitem__(name): #уэээээээээ
+  return get(name)
+def __setitem__(name,value):
+  set(name,value)

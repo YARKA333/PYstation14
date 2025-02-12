@@ -1,9 +1,13 @@
-import Utils.events as events
-import Utils.shared as shared
 from Modules.rsi import *
 import math
-class Transform:
+from Modules.component import BaseComponent,component
+from Utils.vector2 import Vector
+
+@component
+class Transform(BaseComponent):
   def __init__(self,entity,component:dict):
+    entity.xform=self
+    self.entity=entity
     self.uid=entity.uid
     result={}
     pos=component.get("pos",None)
@@ -12,33 +16,29 @@ class Transform:
     events.subscribe("teleport",self.replace,self.uid)
     self.parent=int(component.get("parent",0))
     self.maingrid=shared.get("layerMap").uid==self.parent
-    self.maingrid=True
     if not self.maingrid:pos=[666,666]
     #anc=dict.get(component,"anchored",None)
-    if type(pos)==list:
-      self.pos=pos
-      component.update({"pos":self.pos})
-    elif pos!=None:
-      self.pos=[float(a) for a in pos.split(",")]
-      component.update({"pos":self.pos})
-    else:
-      print("no position for object",self.uid)
-      self.pos=[0,0]
+    if pos is None:
+      print(f"object {self.uid} dont have position")
+    self.pos=Vector(pos)
     if anc!=None:
       self.anchor=1
       if self.maingrid:
         grid=shared.get("globalgrid")
-        grid.add(str(self.pos),self.uid)
+        grid.add(str(self.pos),entity)
       #shared.set(grid)
     else:
       self.anchor=0
     if rot!=None:
-      self.rot=angle(rot)
+      self.rot=str_angle(rot)
       component.update({"rot":self.rot})
     else:
       self.rot=0
     if self.maingrid:
       events.call("Transform",self,self.uid)
+
+  def get_dir(self):
+    return int((self.rot+45)%360)//90
 
   def replace(self,args):
     anc=args.get("anc")
@@ -46,12 +46,12 @@ class Transform:
       self.anchor=anc
     pos=args.get("pos")
     if not pos is None:
-      pos=list(pos)
-      if math.isnan(pos[0]) or math.isnan(pos[1]):
+      dos=list(pos)
+      if math.isnan(dos[0]) or math.isnan(dos[1]):
         pass
         #self.pos=[0,0]
       else:
-        self.pos=list(pos)
+        self.pos=Vector(pos)
     rot=args.get("rot")
     if not rot is None:
       rot=float(rot)
@@ -64,3 +64,11 @@ class Transform:
     if not par is None:
       self.parent=par
     events.call("Transform",self,self.uid)
+
+  def __repr__(self):
+    return "\n".join([
+      f"pos: {self.pos}",
+      f"rot: {self.rot}",
+      "Anchored" if self.anchor else "Loose"
+      f"Parent: {self.parent}"
+    ])

@@ -5,12 +5,14 @@ from Modules.rsi import joinpath
 import Utils.shared as shared
 
 icondir=joinpath(shared.get("resources"),"Textures/Interface")
-def icon(name:str)->pg.Surface:
+def icon(name:str,resize=True)->pg.Surface:
   name=joinpath(icondir,name)
-  img=pg.transform.smoothscale_by(pg.image.load(name),0.5)
-  size=32
-  surf=pg.Surface((size,size),pg.SRCALPHA)
-  surf.blit(img,[(size-img.width)/2,(size-img.height)/2])
+  surf=pg.image.load(name)
+  if resize:
+    img=pg.transform.smoothscale_by(surf,0.5)
+    size=32
+    surf=pg.Surface((size,size),pg.SRCALPHA)
+    surf.blit(img,[(size-img.width)/2,(size-img.height)/2])
   return surf
 
 img_examine=icon("VerbIcons/examine.svg.192dpi.png")

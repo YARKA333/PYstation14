@@ -5,6 +5,7 @@ import Modules.entityModule as eMod
 from Modules.rsi import *
 import Modules.Interface as iFace
 import Modules.Verbs as Verbs
+from Utils.vector2 import Vector
 
 class Spawn:
   def __init__(self):
@@ -31,25 +32,32 @@ def getName(uid):
   except:return "ERR 1"
   return (comp.name if comp else "ERR 0")
 
-
+popups=[]
 mouse_mask=pg.mask.Mask((3,3),fill=True)
 
-pos=[0,0]
-gpos=[0,0]
+pos=Vector()
+gpos=Vector()
 hovered=None
 holding=None
 ishovered=0
 lasthovered=0
 buttons=[False]*3
 uiactive=0
-scanRect=None
-windows:{str:iFace.ContextMenu}={}
+scanRect:"ScanRect"=None
+windows:dict[str:iFace.ContextMenu]={}
 active=0
 
+
+  #popup
+popup_font=pg.Font(joinpath(shared.get("resources"),"/Fonts/NotoSans/NotoSans-Italic.ttf"),13)
+MinimumPopupLifetime=0.7
+MaximumPopupLifetime=5
+PopupLifetimePerCharacter=0.04
+
 class ScanRect:
-  def __init__(self,gpos):
-    self.pos=[gpos[0]-8,gpos[1]-8]
-    self.rect=pg.Rect(self.pos,[16,16])
+  def __init__(self,gpos:Vector):
+    self.pos=gpos-[8,8]
+    self.rect=pg.Rect(self.pos.pos,[16,16])
     self.mask=pg.Mask([16,16],True)
     self.result=[]
 
@@ -79,8 +87,8 @@ def update(args):
       menu.calculate()
       windows|={"contextmenu":menu}
     scanRect=None
-  pos=pg.mouse.get_pos()
-  gpos=[pos[0]/2,pos[1]/2]
+  pos=Vector(pg.mouse.get_pos())
+  gpos=pos/2
   pressed=pg.mouse.get_pressed(num_buttons=3)
   for i in range(3):
     if not buttons[i] and pressed[i]:
@@ -89,10 +97,10 @@ def update(args):
         if spawn.spawning:
           s=args["gpos"]
           w=pg.display.get_window_size()
-          spawn.click(i,[s[0]+(pos[0]-w[0]/2)/64,s[1]-(pos[1]-w[1]/2)/64+1])
+          spawn.click(i,[s[0]+(pos[0]-w[0]/2)/64,s[1]-(pos[1]-w[1]/2)/64])
         elif i==0:
           if holding:
-            events.call("use",{"target":hovered,"pos":[pos[0]/2,pos[1]/2]},entity=holding)
+            events.call("use",{"target":hovered,"pos":gpos},entity=holding)
           else:
             events.call("use",entity=hovered)
         elif i==2:
@@ -104,7 +112,7 @@ def update(args):
   lasthovered=hovered
   ishovered=0
   return {"hover":hovered}
-
+from Utils.watch import watch
 def drowerlay(args):
   global uiactive,active
   surf=args["surf"]
@@ -116,23 +124,63 @@ def drowerlay(args):
     active+=cout[1]
   pg.mouse.set_cursor(cursors[bool(active)])
   active=0
+  for popup in popups.copy():
+    popup["time"]+=args["delta"]
+    lifetime=popup["lifetime"]
+    total_time=popup["time"]
+    vis=min(1.0,1.0-max(0.0,total_time-lifetime/2)*2/lifetime)*255
+    img=popup_font.render(popup["message"],True,[255,255,255])
+    img.set_alpha(vis)
+    dpos=transpose(popup["pos"],args["dpos"],args["surf"])
+    dpos=[dpos[0]-img.width/2,dpos[1]-img.height/2-min(8.0,12.0*(total_time**2+total_time))]
+    surf.blit(img,dpos)
+    if not vis:
+      popups.remove(popup)
+
+
+
 events.subscribe("overlay",drowerlay)
 
-def checkMouse(image,imagepos,uid):
+def transpose(gpos,spos,surf:pg.Surface):
+  return (-spos[0]*2
+   +surf.size[0]/2
+   +gpos[0]*64,
+   (-spos[1]*2
+    -surf.size[1]/2
+    +gpos[1]*64)*-1)
+
+def PopupPos(message,pos):
+  popup={
+    "message":message,
+    "pos":pos,
+    "lifetime":pg.math.clamp(len(message)*PopupLifetimePerCharacter,MinimumPopupLifetime,MaximumPopupLifetime),
+    "time":0
+  }
+  popups.append(popup)
+
+def PopupEntity(message,entity):
+  if isinstance(entity,int):entity=eMod.find(entity)
+  pos=entity.comp("Transform").pos
+  PopupPos(message,pos)
+
+
+
+
+def checkMouse(image,imagepos:Vector,uid):
   """
   check if @image in @imagepos is under mouse, and if it is set hovered id to @uid
   """
   global ishovered,hovered,scanRect
   size=image.get_size()
-  rect=pg.Rect(imagepos,size)
+  rect=pg.Rect(imagepos.pos,size)
   if spawn.spawning:return
   if uiactive:return
-  scanRectSus=scanRect and rect.colliderect(scanRect)
-  if not(rect.collidepoint(gpos) or scanRectSus): return
+  scanRectSus=scanRect and rect.colliderect(scanRect.rect)
+  if not(rect.collidepoint(gpos.pos) or scanRectSus): return
   mask=pg.mask.from_surface(image,1)
-  if scanRectSus and mask.overlap(scanRect.mask,[scanRect.pos[i]-imagepos[i] for i in [0,1]]):
+  if scanRectSus and mask.overlap(scanRect.mask,(scanRect.pos-imagepos).pos):
       scanRect.result.append(uid)
-  if mask.overlap(mouse_mask,[gpos[i]-imagepos[i] for i in [0,1]]):
+  if mask.overlap(mouse_mask,(gpos-imagepos).pos):
     hovered=uid
     ishovered=1
 

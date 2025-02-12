@@ -1,11 +1,13 @@
 import pygame as pg
 import Utils.events as events
+from Modules.component import BaseComponent,component
 
 convolution_mask=pg.mask.Mask((3,3),fill=True)
 
-class InteractionOutline:
+@component
+class InteractionOutline(BaseComponent):
   def __init__(self,entity,args):
-    pass
+    ...
 
 mouse=[0,0]
 def update_mouse(arg):

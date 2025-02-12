@@ -11,3 +11,6 @@
 /prototypes.pk
 /kake_check_test.py
 /kake/
+/tests/
+/dist/
+/build/

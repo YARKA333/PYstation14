@@ -1,41 +1,35 @@
 import pickle as picklelib
-
-import ruamel.yaml.comments
-from ruamel.yaml.loader import RoundTripLoader
-from yaml.loader import FullLoader
-
-from Modules.rsi import *
+from Modules.rsi import namelist,joinpath
 from tqdm import tqdm
-import os.path
-import shutil
 import json as jsonlib
 names,cerrors,allProtos=[],[],[]
 import yaml
-def detag(data):
-  if isinstance(data,dict):
-    return {k:detag(v) for k,v in data.items()}
-  elif isinstance(data,list):
-    return [detag(v) for v in data]
-  elif isinstance(data,ruamel.yaml.comments.TaggedScalar):
-    l=data._yaml_tag.suffix.split(":")
-    d={l[0]:l[1]}
-    print(d)
-    return d
-  else:
-    return data
+from yaml_tag import TagPlaceholder
 
-yaml=ruamel.yaml.YAML(typ="rt")
+yaml.CLoader.yaml_implicit_resolvers.pop("O")
+yaml.CLoader.yaml_implicit_resolvers.pop("o")
+
+
+#yaml.add_constructor(None,TagPlaceholder)
+yaml.CLoader.add_constructor(None,TagPlaceholder)
 #@numba.njit(cache=1)
 def load_protos(reload=False,source=None,pickle=False,json=False):
   global names,allProtos
   namess=namelist("Prototypes/",source)
   names=[name for name in namess if name.endswith(".yml")]
   for name in tqdm(names,desc="Reading protos"):
+    with open(joinpath(source,"Prototypes/",name),"rt",encoding="UTF-8") as file:
+      text=file.read()
+    if not text: continue
     try:
-      allProtos+=yaml.load(openfile(joinpath("Prototypes/",name),source))
+      data=yaml.load(text,yaml.CLoader)
+      if data:
+        allProtos+=data
     except Exception as error:
-     print(f"{error} in file {name}")
-    #  cerrors.append(f"{error} in file {name}")
+
+      print(f"{error} in file {name}")
+      print(text)
+      cerrors.append(f"{error} in file {name}")
 
   with open("errors.log","w") as file:
     file.write("\n".join(cerrors))
@@ -50,7 +44,7 @@ def load_protos(reload=False,source=None,pickle=False,json=False):
       print(f'proto {id} is conflicting')
     else:
       type[id]=proto
-  allp=detag(allp)
+  #allp=detag(allp)
   input("press enter to continue")
   print(allp["entity"])
   input("press enter to dump")
@@ -58,18 +52,15 @@ def load_protos(reload=False,source=None,pickle=False,json=False):
     try:
       with open("protrotypes.json","wt") as file:
         jsonlib.dump(allp,file)
+      print("json dump successfull")
     except Exception as error:print(error)
   if pickle:
     try:
-      with open("kake/prototypes.pk","wb") as file:
+      with open("prototypes.pk","wb") as file:
         picklelib.dump(allp,file)
+      print("pickle dump successfull")
     except Exception as error:print(error)
 
 
 if __name__=="__main__":
-  load_protos(True,json=True,pickle=True,source="C:/Servers/SS14 c2/Resources")
-  #with open("kake/prototypes.pk","rb") as file:
-  #  allp=pickle.load(file)
-  #allp={1:2}
-  #with open("protrotypes.json","wt") as file:
-  #  jsonlib.dump(allp,file)
+  load_protos(True,json=False,pickle=True,source="C:/Servers/SS14 c2/Resources")

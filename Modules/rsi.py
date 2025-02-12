@@ -1,33 +1,38 @@
-print("rsi loading")
+print("rsi.py loading")
+if __name__=="__main__":
+  raise RuntimeError("why did you do this")
+
 import io
 import os.path
-import numba
-#import yaml
+import traceback
 import math
 #from tqdm import tqdm
 import time
 import pygame as pg
 import json
-import random
 import pickle
 import ruamel
 from ruamel import yaml as ryaml
 import Utils.shared as shared
+import Utils.hasher as hasher
 from pathlib import Path
 from zipfile import ZipFile
-from colors import colors
+import dill
+from Utils.serial import Surface
+from Utils.vector2 import Vector
 #from threading import Thread
 
-if __name__=="__main__":
-  raise RuntimeError("why did you do this")
 
+resources=shared.get("resources")
 yaml=ryaml.YAML(typ='rt')
 allr={}
 pg.init()
 
+print("rsi.py inited")
+
 class _State:
   def __init__(self,path,state,source=None):
-    self.image=pg.image.load(openfile(joinpath(path,state["name"]+".png"),source)).convert_alpha()
+    self.image=Surface(pg.image.load(openfile(joinpath(path,state["name"]+".png"),source)).convert_alpha())
 
     self.image_x,self.image_y=self.image.get_size()
     if "directions" in state:
@@ -68,6 +73,11 @@ class RSI:
     self.states={}
     for state in meta["states"]:
       self.states.update({state["name"]:_State(path,state,source)})
+  @property
+  def size(self):
+    return Vector(self.frame_x,self.frame_y)
+  def __str__(self):
+    return f"RSI({self.path})"
   def __call__(self,size:float|int=1,state:str|None=None,dir:int=0,frame:int|None=None,otime:float=0,nowarn:bool=False)->pg.Surface:
     state=self.getstate(state,nowarn)
     dir=dir%state.directions
@@ -82,55 +92,24 @@ class RSI:
       surf=pg.transform.scale_by(surf,size)
     return surf
   def getstateframes(self,state:str=None,dir:int=0)->int:
-    if state==None:state=self.states[self.default]
-    else:state=self.states[state]
-    return state.getframes(dir)
+    if not state in self.states:
+      state=self.default
+    return self.states[state].getframes(dir)
   def getstate(self,state:str=None,nowarn:bool=False):
-    if state==None:
-      state=self.states[self.default]
-    else:
-      state=str(state)
-    if state in self.states.keys():
+    state=str(state)
+    if state in self.states:
       return self.states[state]
     else:
       if self.path!="Textures/deprecated.rsi" and not nowarn:
+        traceback.print_stack()
         print(f"Tried to get state \"{state}\" of object \"{self.path}\"")
       return self.states[self.default]
   def getstates(self)->list:return self.states.keys()
-  def getframe(self,state:str=None,dir:int=0,frame:int=None,otime:float=0,nowarn:bool=False)->int:
+  def getframe(self,state:str=None,dir:int=0,frame:int=None,otime:float=0,nowarn:bool=True)->int:
     state=self.getstate(state,nowarn)
     return state.getframe(dir,frame,otime)
-  def getdirs(self,state=None,nowarn=False):
-    if state==None: state=self.states[self.default]
-    else:
-      state=str(state)
-      if state in self.states.keys():
-          state=self.states[state]
-      else:
-        if self.path!="Textures/deprecated.rsi" and not nowarn:
-          print(f"Tried to get state dirs \"{state}\" of object \"{self.path}\"")
-        state=self.states[self.default]
-    return state.directions
-
-def findcolor(color:str):
-  new=hextorgb(color,True)
-  if new:return new
-  new=colors.get(color.capitalize())
-  if new:return new
-  print(f"color not found: {color}")
-  return [255,0,255]
-
-def hextorgb(hex:str,nowarn=False)->list:
-  """Converts hex color string to rgb(a) format
-  \n For example:
-  \n   '#FF2AB5EC' -> [255,42,181,236]"""
-
-  hex2=hex.replace("#","")
-  try:
-    return [int(hex2[i*2:i*2+2],16) for i in range(len(hex2)//2)]
-  except:
-    if not nowarn:
-      print(f"hextorgb failed: {hex}")
+  def getdirs(self,state=None,nowarn=True):
+    return self.getstate(state,nowarn).directions
 
 def yml(path,raw=False):
   try:
@@ -141,30 +120,6 @@ def yml(path,raw=False):
       return yaml.load(openfile(path))
   except Exception as error:print(f'{error} \nError when opening {path} in {raw and "raw" or "auto"} mode')
 
-
-
-class Decal:
-  def __init__(self,data):
-    node=data["node"]
-    id=node["id"]
-    spritedata=decal_protos[id]["sprite"]
-    rsi=spritedata["sprite"]
-    if not rsi in decal_rsi.keys():
-      decal_rsi.update({rsi:RSI(rsi)})
-    try:ang=angle(node["angle"])
-    except:ang=0
-    color=[int(node["color"][i*2+1:i*2+3],16) for i in range(4)]
-    self.sprite=pg.transform.rotate(decal_rsi[rsi](state=spritedata["state"]),ang)
-    self.sprite.fill(color[:3],special_flags=pg.BLEND_RGB_MULT)
-    self.sprite.convert_alpha()
-    self.sprite.set_alpha(color[3])
-    self.instances=dict([(c,[float(b) for b in a.split(",")]) for c,a in data["decals"].items()])
-
-  def prebake(self,chunks,cmap):
-    for ins in self.instances.values():
-      cpos=[ins[i]//16 for i in [0,1]]
-      dpos=[ins[0]%16*32,(15-ins[1]%16)*32]
-      chunks[cmap.index(cpos)].blit(self.sprite,dpos)
 
 def openfile(path,source=None):
   if not source:source=shared.get("resources")
@@ -230,11 +185,33 @@ def joinpath(*paths:str|os.PathLike):
   return result
 
 def loadrsi(name):
-  result=dict.get(allr,name)
+  result=allr.get(name)
   if not result:
     result=RSI(name)
     allr.update({name:result})
   return result
+from tqdm import tqdm
+def preload_rsi():
+  print("preloading .RSI")
+  global allr
+  kake_path="kake/rsi.dill"
+  path=joinpath(resources,"Textures")
+  old_hash=hasher.get_hash("Textures")
+  new_hash=hasher.hash_path(path)
+  if os.path.exists(kake_path) and new_hash==old_hash:
+    with open(kake_path,"rb") as file:
+      allr=dill.load(file)
+  else:
+    files=namelist("Textures")
+    for path in tqdm(files,desc="Textures updating... "):
+      if not path.endswith(".rsi/meta.json"):continue
+      loadrsi(path.replace("/meta.json",""))
+    with open(kake_path,"wb") as file:
+      dill.dump(allr,file)
+    hasher.set_hash("Textures",new_hash)
+    print("re",end="")
+  print(f"loaded {len(allr)} .RSI")
+
 
 def findict(dicts,key,value=None,maxdepth=0):
   if type(dicts)==ruamel.yaml.CommentedMap and key in dicts and (value==None or dicts[key]==value):
@@ -252,7 +229,7 @@ def findict(dicts,key,value=None,maxdepth=0):
     #else: print((" "*-maxdepth)+str(dicts))
   return False
 
-def angle(raw:str):
+def str_angle(raw:str):
   return round(float(raw.split(" ")[0])/math.pi*180)
 
 def strtuple(cor:str)->list[int]:
@@ -268,23 +245,30 @@ def findproto(id,list:list):
 
 allprotos={}
 allp={}
-decal_protos={}
-decal_rsi={}
 
 def load_protos():
-  global allprotos,allp,tiles,decal_protos
-  ...
-if True:
+  global allprotos,allp,tiles
   print("loading protos")
-  #with open("kake/prototypes.pk","rb") as file:
-  #  allprotos|=pickle.load(file)
-  with open("protrotypes.json","rb") as f:
-    allprotos|=json.load(f)
-
+  from yaml_tag import retag
+  with open("prototypes.pk","rb") as file:
+    allprotos|=retag(pickle.load(file))
   allp|=allprotos["entity"]
-  decal_protos|=allprotos["decal"]
-  print("loaded",len(allp),"protos")
-  print()
+  print("loaded",sum([len(p) for p in allprotos.values()]),"protos")
+  comptypes=[]
+  for en in allp.values():
+    comps=en.get("components")
+    if not comps:continue
+    for c in comps:
+      t=c["type"]
+      if not t in comptypes:
+        comptypes.append(t)
+  print("with total of",len(comptypes),"component types")
+  #print(classes[0])
+  #print(comptypes)
+  #for i in range(100):
+  #  gen=generate()
+  #  #if "-" in gen:
+  #  print(gen)
 
 def vec(a):
   return [max(-1,min(1,abs(4-(a+i)%8)-2)) for i in [-2,0]]
@@ -323,3 +307,5 @@ def resolve(string:str):
     return r
   except:...
   return string
+
+print("rsi.py loaded")

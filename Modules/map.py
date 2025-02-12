@@ -2,10 +2,15 @@ from Modules.rsi import *
 from Modules.Tiles import Floor
 from tqdm import tqdm
 from Utils.parents import typedict
+import Utils.shared as shared
 import pickle
+from yaml_tag import quick_load
+from Utils.vector2 import Vector
 
+resources=shared.get("resources")
 alpha=[chr(i) for i in list(range(65,91))+list(range(97,123))]
 beta=["A","Q","g","w"]
+
 
 def findmapuid(raw:dict,name=None):
   space=raw["entities"]
@@ -13,7 +18,7 @@ def findmapuid(raw:dict,name=None):
     if ent["proto"]!="":continue
     for subent in ent["entities"]:
       for comp in subent["components"]:
-        if comp["type"]=="BecomesStation" and (name==None or name==comp["id"]):
+        if comp["type"]=="MapGrid" and (name==None or name==comp["id"]):
           return (int(subent["uid"]),typedict(subent["components"]))
   print("station not found")
 
@@ -22,7 +27,7 @@ def decode(code:str)->int|None:
   a=alpha.index(code[0])*4
   if code[1] in beta:
     return a+beta.index(code[1]),alpha.index(code[5])
-  return None,None
+  else:raise Exception("map is invalid")
 
 def loadmap(mapid):
     mapPath:str=allprotos["gameMap"][mapid]["mapPath"]
@@ -34,7 +39,7 @@ def loadmap(mapid):
         map_file=pickle.load(kakefile)
     else:
       print("cache not found\nProcessing layerMap...")
-      map_file=yml(mapPath)
+      map_file=quick_load(joinpath(resources,mapPath))
       ensuredir(kakePath)
       with open(kakePath,"xb") as kakefile:
         pickle.dump(map_file,kakefile)
@@ -56,7 +61,7 @@ def loadfloor(comps):
         a=chunk_data[i*8:i*8+8]
         chunkline.append(a)
       chunk.append(chunkline)
-    cmap.append([int(a) for a in offset.split(",")])
+    cmap.append(Vector(offset))
     grid.append(chunk)
   return [cmap,grid]
 

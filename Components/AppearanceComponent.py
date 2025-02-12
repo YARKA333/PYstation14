@@ -1,7 +1,9 @@
 import Components.SpriteComponent
+from Modules.component import BaseComponent,component
 import Utils.events as events
 
-class Appearance:
+@component
+class Appearance(BaseComponent):
   def __init__(self,entity,args):
     self.uid=entity.uid
     self.data={}
@@ -9,17 +11,15 @@ class Appearance:
     events.subscribe("get_appearance",self.get,self.uid)
   def set(self,args):
     self.data|=args
-    print(f"appearance changed:{self.data}")
     events.call("AppearanceChanged",self.data,self.uid)
   def get(self,args):
     return self.data
 
-class GenericVisualizer:
+@component
+class GenericVisualizer(BaseComponent):
   def __init__(self,entity,args):
-
     self.uid=entity.uid
     self.data=args.get("visuals")
-    print("GenVis:",self.data)
     if not self.data:print("genvis empty")
     self.sprite:Components.SpriteComponent.Sprite=None
     events.followcomp("Sprite",self.setsprite,entity)
@@ -46,12 +46,12 @@ class GenericVisualizer:
           if action:return action
           print(f"no action to {value} in {actions}")
         action=reformat()
-        print(action)
         layer=self.sprite.layerMap.get(map)
         if not layer:
           print(f"genvis cant find layer map {map}")
           continue
-        print(f"applying layer {map} data {action}")
-        layer|=action
-
+        layer.__dict__|=action
+        layer.checkInert()
+  def __repr__(self):
+    return "data: "+str(self.data)
 

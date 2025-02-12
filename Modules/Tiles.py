@@ -1,12 +1,19 @@
-import pygame as pg
-from Modules.rsi import openfile,allprotos,resolve
-import random
+import os
 
-mig:dict=allprotos["tileAlias"]
-tiles:dict=allprotos["tile"]
+import pygame as pg
+from Modules.rsi import openfile,allprotos,resolve,joinpath
+import random
+notile_path=joinpath(os.getcwd(),"assets/noTile.png")
+notile={
+  "type":"tile",
+  "id":"notile",
+  "name":"error",
+  "sprite":notile_path,
+  "isSubFloor":True,
+}
+notile_sprite=pg.image.load(notile_path)
 
 class Floor:
-
   def __init__(self,id:str="Space"):
 
     self.baseTurf="Plating"
@@ -24,15 +31,17 @@ class Floor:
     self.weather=False
     self.indestrictible=False
 
-    try:
+    mig: dict=allprotos["tileAlias"]
+    tiles: dict=allprotos["tile"]
+
+    if id in mig:
       id=mig[id]["target"]
-    except:pass
-    try:
+    if id in tiles:
       tile=tiles[id]
-    except:
+    else:
       print("No tile with id:"+id+"\nReplaced with Space")
       #tile=next((item for item in tiles if item["id"]=="Space"),None)
-      tile=tiles["Space"]
+      tile=notile
     for k,v in tile.items():
       setattr(self,k,resolve(v))
     if hasattr(self,"sprite"):
@@ -51,7 +60,8 @@ class Floor:
     if self.sprite:
       if variant is None:
         return random.choices(self.images,weights=self.placementVariants)[0]
-      else:
-        assert variant<self.variants
+      elif variant<self.variants:
         return self.images[variant]
+      else:
+        return notile_sprite
     else: return False

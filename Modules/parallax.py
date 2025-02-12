@@ -1,11 +1,11 @@
+import os.path
 import random
-import pygame as pg
-import random
-import math
 from Modules.rsi import *
 import tomllib
 import noise
 from tqdm import tqdm
+from yaml_tag import tag
+from Utils.colors import hextorgb
 
 def calcfill(src,dst):
   #if not dst:dst=[WIDTH,HEIGHT]
@@ -47,24 +47,45 @@ default_proto={
   "tiled":True,
 }
 
-class BaseParallaxLayer:
-  def baseinit(self,proto):
-    self.offset=[0,0]
-    self.scroll=declist(proto["scrolling"])
-    self.scale=declist(proto["scale"])
-    self.speed=(1-proto["slowness"])
-    self.offset=[0,0]
-    self.scroll=declist(proto["scrolling"])
-    self.scale=declist(proto["scale"])
-class Stars:
+class Layer:
   def __init__(self,proto):
-    self.offset=[0,0]
-    self.scroll=declist(proto["scrolling"])
-    self.scale=declist(proto["scale"])
-    toml=tomllib.load(openfile(proto["texture"]["configPath"]))
-    self.image=pg.Surface([1920, 1080],flags=pg.SRCALPHA)
-    self.speed=(1-proto["slowness"])
+    self.image=proto["texture"]
+    if self.image:
+      self.offset=[0,0]
+      self.scroll=declist(proto["scrolling"])
+      self.scale=[a/1 for a in declist(proto["scale"])]
+      self.speed=(1-proto["slowness"])
+
+      self.image=pg.transform.scale_by(self.image,self.scale[0]*2)
+      if "tiled" in proto.keys() and not proto["tiled"]:
+        self.baked=None
+      else:
+        self.baked=calcbake(self.image)
+      self.size=self.image.get_size()
+  def draw(self,surf:pg.Surface,x,y):
+    if not self.image:return
+    self.offset[0]-=self.scroll[0]*.5
+    self.offset[1]-=self.scroll[1]*.5
+    if self.baked:
+      surf.blit(self.baked,[
+        (-x*self.speed+self.offset[0])%self.size[0]-self.size[0],
+        (y*self.speed+self.offset[1])%self.size[1]-self.size[1]])
+    else:
+
+      surf.blit(self.image,[-x*self.speed,y*self.speed])
+@tag("ImageParallaxTextureSource")
+def image_texture(path):return pg.image.load(openfile(path))
+@tag("GeneratedParallaxTextureSource")
+def generated_texture(configPath,id):
+  path=f"kake/parallax/{id}.png"
+  if os.path.exists(path):
+    image=pg.image.load(path)
+  else:
+    def alpha(color):return color+[min(sum(color),255)]
+    image=pg.Surface([960,540],flags=pg.SRCALPHA)
+    toml=tomllib.load(openfile(configPath))
     for tomlayer in reversed(toml["layers"]):
+      print(tomlayer)
       if tomlayer["type"]=="points":
         layer=default_layer.copy()
         layer.update(tomlayer)
@@ -81,9 +102,9 @@ class Stars:
           threshVal=1/(1-float(layer["maskthreshold"]))
           powFactor=1/float(layer["maskpower"])
         i=0
-        while i<layer["count"]:
-          x=random.randint(0,self.image.get_width())
-          y=random.randint(0,self.image.get_height())
+        while i<layer["count"]//4:
+          x=random.randint(0,image.get_width())
+          y=random.randint(0,image.get_height())
           if layer["mask"]:
             noiseVal=noise.snoise2(x*freq+seed*12345,y*freq-seed*54321,octaves=octs,persistence=pers,lacunarity=lacu)
             noiseVal=min(1,max(0,noiseVal+1)/2)
@@ -94,44 +115,12 @@ class Stars:
             if randomThresh>noiseVal:
               continue
           dist=random.random()
-          self.image.fill(
-            [farcolor[i]*dist+closecolor[i]*(1-dist) for i in range(3)],
+          image.fill(alpha([farcolor[j]*dist+closecolor[j]*(1-dist) for j in range(3)]),
             [x-o,y-o,o*2+1,o*2+1])
           i+=1
-    self.image=pg.transform.scale_by(self.image,self.scale)
-    self.baked=calcbake(self.image)
-    self.size=self.image.get_size()
-  def draw(self,surf:pg.Surface,x,y):
-    self.offset[0]-=self.scroll[0]
-    self.offset[1]-=self.scroll[1]
-    surf.blit(self.baked,
-      [(-x*self.speed+self.offset[0])%self.size[0]-self.size[0],
-      (y*self.speed+self.offset[1])%self.size[1]-self.size[1]],special_flags=pg.BLEND_ADD)
-
-class Background:
-  def __init__(self,proto):
-    self.offset=[0,0]
-    self.scroll=declist(proto["scrolling"])
-    self.scale=declist(proto["scale"])
-    self.speed=(1-proto["slowness"])
-    self.image=pg.image.load(openfile(proto["texture"]["path"]))
-
-    self.image=pg.transform.scale_by(self.image,self.scale[0])
-    if "tiled" in proto.keys() and not proto["tiled"]:
-      self.baked=None
-    else:
-      self.baked=calcbake(self.image)
-    self.size=self.image.get_size()
-
-  def draw(self,surf,x,y):
-    self.offset[0]-=self.scroll[0]*.5
-    self.offset[1]-=self.scroll[1]*.5
-    if self.baked:
-      surf.blit(self.baked,[
-        (-x*self.speed+self.offset[0])%self.size[0]-self.size[0],
-        (y*self.speed+self.offset[1])%self.size[1]-self.size[1]])
-    else:
-      surf.blit(self.image,[-x*self.speed,y*self.speed])
+    ensuredir(path)
+    pg.image.save(image,path)
+  return image
 
 class Parallax:
   def __init__(self,id):
@@ -139,11 +128,9 @@ class Parallax:
     ymlayers=allprotos["parallax"][id]["layers"]
     for ymlayer in tqdm(ymlayers,desc="generating parallax... "):
       proto=default_proto.copy()
+      print(ymlayer)
       proto.update(ymlayer)
-      if "path" in proto["texture"].keys():
-        self.layers.append(Background(proto))
-      if "configPath" in proto["texture"].keys():
-        self.layers.append(Stars(proto))
+      self.layers.append(Layer(proto))
   def draw(self,surf,x,y):
     for layer in self.layers:
       layer.draw(surf,x,y)

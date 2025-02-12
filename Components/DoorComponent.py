@@ -1,31 +1,14 @@
-#from enum import Enum
 import Components.SpriteComponent
+from Modules.component import BaseComponent,component
+import Modules.Verbs as verbs
+from Modules.soundModule import *
+from Modules.UInput import PopupEntity
+from Modules.Locale import Loc
 import Utils.events as events
 import time
-import Modules.Verbs as verbs
-import pygame as pg
-from Modules.soundModule import *
-#DoorStates=Enum("DoorStates",["Open","closing","Closed","Opening","Welded","Denying","Emagging"])
 active_doors=[]
 
-component={
-  "state":"Closed",
-  "openingAnimationTime":1.0,
-  "closingAnimationTime":1.0,
-  "openingTimeOne":0.4,
-  "openingTimeTwo":0.2,
-  "closingTimeOne":0.4,
-  "closingTimeTwo":0.2,
-  "emagDuration":0.8,
-  "denyDuration":0.45,
-  "occludes":True,
-  "openDrawDepth":"Doors",
-  "closedDrawDepth":"Doors",
-  "openSound":{"path":"/Audio/Effects/explosion1.ogg"},
-  "closeSound":{"path":"/Audio/Effects/explosion1.ogg"},
-  "denySound":{"path":"/Audio/Effects/explosion1.ogg"},
-  "sparksSound":{"collection":"sparks"},
-}
+
 
 icondeny=verbs.icon("info.svg.192dpi.png")
 iconemag=verbs.icon("VerbIcons/zap.svg.192dpi.png")
@@ -40,9 +23,31 @@ events.subscribe("frame",frame)
 
 
 
-class Door:
+@component
+class Door(BaseComponent):
+  after = ["Sprite"]
+  base_component={
+    "state":"Closed",
+    "openingAnimationTime":1.0,
+    "closingAnimationTime":1.0,
+    "openingTimeOne":0.4,
+    "openingTimeTwo":0.2,
+    "closingTimeOne":0.4,
+    "closingTimeTwo":0.2,
+    "emagDuration":0.8,
+    "denyDuration":0.45,
+    "occludes":True,
+    "openDrawDepth":"Doors",
+    "closedDrawDepth":"Doors",
+    "openSound":{"path":"/Audio/Effects/explosion1.ogg"},
+    "closeSound":{"path":"/Audio/Effects/explosion1.ogg"},
+    "denySound":{"path":"/Audio/Effects/explosion1.ogg"},
+    "sparksSound":{"collection":"sparks"},
+  }
+
+
   def __init__(self,entity,args):
-    self.comp=component.copy()
+    self.comp=self.base_component.copy()
     self.comp.update(args)
     self.uid=entity.uid
     self.partial=False
@@ -55,7 +60,6 @@ class Door:
     self.nextTime=None
     self.appear()
   def getVerbs(self,args):
-    print("ae")
     return [{
       "name":"Toggle",
       "priority":10,
@@ -78,10 +82,20 @@ class Door:
   def activate(self,args):
     active_doors.append(self)
     if self.comp["state"]=="Closed":
+      args={"cancelled":False}
+      events.call("BeforeDoorOpened",args,self.uid)
+      if args["cancelled"]:return
+
+      PopupEntity("Боевой режим включён!",self.uid)
       self.setstate("Opening")
       self.nextTime=time.time()+self.comp["openingTimeOne"]
       playSound(self.comp["openSound"],0.5)
     elif self.comp["state"]=="Open":
+      args={"cancelled":False}
+      events.call("BeforeDoorClosed",args,self.uid)
+      if args["cancelled"]:return
+
+      PopupEntity("Боевой режим отключён!",self.uid)
       self.setstate("Closing")
       self.nextTime=time.time()+self.comp["closingTimeOne"]
       playSound(self.comp["closeSound"],0.5)
@@ -91,35 +105,44 @@ class Door:
     self.nextTime=time.time()+self.comp["emagDuration"]
     playSound(self.comp["sparksSound"],0.5)
     active_doors.append(self)
+
   def deny(self,args):
+    args={"cancelled":False}
+    events.call("BeforeDoorDenied",args,self.uid)
+    if args["cancelled"]: return
+
     self.setstate("Denying")
     self.nextTime=time.time()+self.comp["denyDuration"]
     playSound(self.comp["denySound"],0.5)
     active_doors.append(self)
-  def setlayer(self,args):
-    events.call("setspritelayer",args,self.uid)
+  def trysetstate(self,map,state):
+    layer=self.sprite.layerMap.get(map)
+    if layer:
+      layer.state=state
+    else:
+      print(f"failed to get layer {map}")
+  def set_states(self,baseState,unlitState):
+    self.trysetstate("enum.DoorVisualLayers.Base",baseState)
+    self.trysetstate("enum.DoorVisualLayers.BaseUnlit",unlitState)
   def appear(self):
     comp=self.comp["state"]
-    if   comp=="Open":
-      self.setlayer({"index":0,"state":"open"})
-      self.setlayer({"index":1,"state":"open_unlit"})
-      events.call("setDepth",{"depth":self.comp["openDrawDepth"]},self.uid)
-    elif comp=="Closing":
-      self.setlayer({"index":0,"state":"closing"})
-      self.setlayer({"index":1,"state":"closing_unlit"})
-    elif comp=="Closed":
-      self.setlayer({"index":0,"state":"closed"})
-      self.setlayer({"index":1,"state":"closed_unlit"})
-      events.call("setDepth",{"depth":self.comp["closedDrawDepth"]},self.uid)
-    elif comp=="Opening":
-      self.setlayer({"index":0,"state":"opening"})
-      self.setlayer({"index":1,"state":"opening_unlit"})
-    elif comp=="Emagging":
-      self.setlayer({"index":0,"state":"closed"})
-      self.setlayer({"index":1,"state":"sparks"})
-    elif comp=="Denying":
-      self.setlayer({"index":0,"state":"closed"})
-      self.setlayer({"index":1,"state":"deny_unlit"})
+    match comp:
+      case "Open":
+        self.set_states("open","open_unlit")
+        events.call("setDepth",{"depth":self.comp["openDrawDepth"]},self.uid)
+      case "Closing":
+        self.set_states("closing","closing_unlit")
+      case "Closed":
+        self.set_states("closed","closed_unlit")
+        events.call("setDepth",{"depth":self.comp["closedDrawDepth"]},self.uid)
+      case "Opening":
+        self.set_states("opening","opening_unlit")
+      case "Emagging":
+        self.set_states("closed","sparks")
+      case "Denying":
+        self.set_states("closed","deny_unlit")
+      case _:
+        print("DOOR: THE WHAT")
   def update(self):
     if self.nextTime==None:return
     if time.time()>=self.nextTime:
@@ -153,10 +176,69 @@ class Door:
   def Sprite(self,args):
     self.sprite=args
     events.call("updateMap",{
-      "enum.DoorVisualLayers.Base":True,
-      "enum.DoorVisualLayers.BaseUnlit":True,
       "enum.WeldableLayers.BaseWelded":False,
-      "enum.DoorVisualLayers.BaseBolted":False,
+      "enum.DoorVisualLayers.BaseUnlit":True,
       "enum.DoorVisualLayers.BaseEmergencyAccess":False,
       "enum.WiresVisualLayers.MaintenancePanel":False
     },self.uid)
+
+@component
+class DoorBolt(BaseComponent):
+  icobolt=verbs.icon("AdminActions/bolt.png",False)
+  icounbolt=verbs.icon("AdminActions/unbolt.png",False)
+  base_component={
+    "BoltsUpSound":PathSound("/Audio/Machines/boltsup.ogg"),
+    "BoltsDownSound":PathSound("/Audio/Machines/boltsdown.ogg"),
+    "BoltsDown":False,
+    "BoltLightsEnabled":True,
+  }
+
+  def __init__(self,entity,args):
+    self.comp=self.base_component.copy()
+    self.comp.update(args)
+    self.uid=entity.uid
+
+    events.subscribe("BeforeDoorOpened",self.WAIT_A_MINUTE,self.uid)
+    events.subscribe("BeforeDoorClosed",self.WAIT_A_MINUTE,self.uid)
+    events.subscribe("BeforeDoorDenied",self.WAIT_A_MINUTE,self.uid)
+    events.subscribe("getVerbs",self.getVerbs,self.uid)
+    self.update()
+
+  def getVerbs(self,args):
+    return [{
+      "name":Loc("admin-trick-unbolt-description"),
+      "priority":10,
+      "img":self.icounbolt,
+      "click":self.set_bolts_up,
+    } if self.comp["BoltsDown"] else {
+      "name":Loc("admin-trick-bolt-description"),
+      "priority":10,
+      "img":self.icobolt,
+      "click":self.set_bolts_down,
+    }]
+  def set_bolts(self,state:bool):
+    if self.get_bolts()==state:
+      return False
+
+    self.comp["BoltsDown"]=state
+    self.comp["Bolts"+("Down" if state else "Up")+"Sound"].play()
+    self.update()
+    return True
+
+  def set_bolts_up(self,args):
+    self.set_bolts(False)
+  def set_bolts_down(self,args):
+    self.set_bolts(True)
+
+  def get_bolts(self)->bool:
+    return self.comp["BoltsDown"]
+
+  def update(self):
+    events.call("updateMap",{
+      "enum.DoorVisualLayers.BaseBolted":self.get_bolts(),
+    },self.uid)
+
+  def WAIT_A_MINUTE(self,args):
+    if self.comp["BoltsDown"]:
+      args["cancelled"]=True
+
