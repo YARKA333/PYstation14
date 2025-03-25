@@ -34,12 +34,21 @@ def hsv(h:float,s:float,v:float)->tuple[int,int,int]:
   return int(r*255),int(g*255),int(b*255)
 
 def findcolor(color:str)->tuple[int,int,int,int]:
-  new=hextorgb(color,True)
-  if new:return new
-  new=colors.get(color.capitalize())
-  if new:return new
-  print(f"color not found: {color}")
-  return [255,0,255,255]
+  if isinstance(color,list):
+    color=tuple(color)
+  if isinstance(color,tuple):
+    match len(color):
+      case 3:return color+(255,)
+      case 4:return color
+      case _:raise ValueError(f"Wrong number of channels: {repr(color)}")
+  elif isinstance(color,str):
+    new=hextorgb(color,True)
+    if new:return new
+    new=colors.get(color.capitalize())
+    if new:return new
+  raise ValueError(f"Wrong color format: {repr(color)}")
+  #print(f"color not found: {color}")
+  #return [255,0,255,255]
 
 def hextorgb(hex:str,nowarn=False)->tuple[int,int,int,int]:
   """Converts hex color string to rgb(a) format

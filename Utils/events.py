@@ -9,6 +9,8 @@ counter=0
 removed=set()
 
 def subscribe(name:str,function:classmethod,entity:int=0,before:str|list|set=None,after:str|list|set=None)->int:
+  #print(f"subto {name}")
+  assert isinstance(entity,int)
   global eventdata,dependata,counter,tokens
   entdata=eventdata.get(entity,{})
   if not entdata:
@@ -47,6 +49,13 @@ def subscribe(name:str,function:classmethod,entity:int=0,before:str|list|set=Non
   namespace.append((function,counter,classname))
   tokens[counter]=(entity,name)
   return counter
+
+def listen(name:str,entity:int=0):
+  def decorator(func):
+    subscribe(name,func,entity)
+    return func
+  return decorator
+
 
 def unsubscribe(token):
   #if token:
@@ -92,6 +101,7 @@ def rcall(name,args=None):
     #w("THE FUNCTION")
 
 def call(name,args:dict={},entity:int=0,noreturn:bool=True,bar:str=None):
+  assert isinstance(entity,int)
   namespace=eventdata.get(entity,{}).get(name,[])
   if not namespace:
     #print(f"NO ONE's LISTENING TO {name}")

@@ -9,6 +9,7 @@ from Modules.Verbs import icon
 import Utils.shared as shared
 from Modules.component import BaseComponent,component
 from Utils.vector2 import Vector
+import Modules.entityModule as eMod
 
 dt=32/60
 
@@ -27,6 +28,7 @@ class CollisionGroup(Enum):
 
   # 32 possible groups
   AllMask=-1
+  NoneMask=0
 
   # Humanoids, etc.
   MobMask=Impassable|HighImpassable|MidImpassable|LowImpassable
@@ -83,21 +85,23 @@ class CollisionGroup(Enum):
 
 
 table=CollisionGroup.__dict__
-print(table)
 @tag("PhysShapeAabb")
-def ps_aabb(bounds="-.5,-.5,.5,.5"):
+def ps_aabb(bounds="-.5,-.5,.5,.5",**kvargs):
+  if kvargs: print(kvargs)
   bounds=list(map(float,bounds.split(",")))
   return munk.Poly(None,[[bounds[i//2*2]*32,bounds[(i+1)%4//2*2+1]*32] for i in range(4)])
 @tag("PhysShapeCircle")
-def ps_circle(radius,position="0,0"):
+def ps_circle(radius,position="0,0",**kvargs):
+  if kvargs: print(kvargs)
   return munk.Circle(None,radius*32,Vector(position).pos)
 @tag("PolygonShape")
-def ps_poly(vertices):
+def ps_poly(vertices,**kvargs):
+  if kvargs:print(kvargs)
   return munk.Poly(None,[(Vector(a)+[1,1]).pos for a in vertices])
 
 
 space=munk.Space()
-space.damping=0.8
+space.damping=0.3
 
 hrenico=icon("fist.svg.192dpi.png")
 debugico=icon("VerbIcons/debug.svg.192dpi.png")
@@ -106,9 +110,9 @@ def toscreen(bpos,dpos,wh):
   return [-dpos[0]*2
           +wh[0]/2
           +bpos[0]*2,
-         (-dpos[1]*2
+        -(-dpos[1]*2
           -wh[1]/2
-          +(bpos[1]-1)*2)*-1+64]
+          +(bpos[1]-1)*2)]
 
 @component
 class Fixtures(BaseComponent):
@@ -119,6 +123,7 @@ class Fixtures(BaseComponent):
 @component
 class Physics(BaseComponent):
   after = ["Transform"]
+  staticjoint=None
   def __init__(self,entity,args):
     if entity.xform.maingrid:
       self.map=shared.get("layerMap")
@@ -145,7 +150,7 @@ class Physics(BaseComponent):
     self.transforming=True
     events.call("teleport",{
       "pos":self.body.position/32,
-      "rot":self.body.angle,
+      "rot":math.degrees(self.body.angle),
     },self.uid)
     self.transforming=False
     #tile: Modules.Tiles.Floor
@@ -175,14 +180,17 @@ class Physics(BaseComponent):
   def nahren(self,args):
     print("nahren!")
     print(self.body.body_type)
-    self.body.apply_force_at_local_point([2,0],[0,0])
+    self.body.apply_force_at_local_point([20,0],[0,0])
 
   def print_data(self,args):
+
     body=self.body
     print("pos",body.position)
+    print("rot",body.angle)
     print("mode",body.body_type)
-    print("mask",self.mask)
-    print("layer",self.layer)
+    for shape in self.body.shapes:
+      print("mask",f"{shape.mask:08b}")
+      print("layer",f"{shape.layer:08b}")
 
   @staticmethod
   def get(key):
@@ -199,7 +207,7 @@ class Physics(BaseComponent):
 
   def Set_collidable(self,args):
     for shape in self.body.shapes:
-      shape.__setattr__("collidable",args.get("_state",shape.collidable))
+      shape.collidable=args.get("state",shape.collidable)
 
   def Transform(self,args):
     if self.transforming:
@@ -207,19 +215,22 @@ class Physics(BaseComponent):
       return
     self.body.position=(args.pos*32).pos
     self.body.angle=math.radians(args.rot)
+    if args.noRot and not self.staticjoint:
+      self.staticjoint=munk.RotaryLimitJoint(
+      self.body,screenbody,0,0)
+      space.add(self.staticjoint)
   def Fixtures(self,args:Fixtures):
     for name,fix in args.fixtures.items():
       shape:munk.Shape=fix.get("shape",{})
-      self.mask=fix.get("mask")
-      self.layer=fix.get("layer")
       if shape:
         self.body.shapes.add(shape)
         shape.body=self.body
         shape.elasticity=0
+        shape.friction=0.2
         shape.mass=1
-        shape.__setattr__("mask",self.get(self.mask))
-        shape.__setattr__("layer",self.get(self.layer))
-        shape.__setattr__("collidable",self.can_collide)
+        shape.mask=self.get(fix.get("mask","NoneMask"))
+        shape.layer=self.get(fix.get("layer","NoneMask"))
+        shape.collidable=self.can_collide
         space.add(shape)
       self.body.body_type={
         "DYNAMIC":munk.body.Body.DYNAMIC,
@@ -228,14 +239,21 @@ class Physics(BaseComponent):
 
 
   def render(self,args):
-    surf=args["surf"]
+    surf:pg.Surface=args["surf"]
     for shape in self.body.shapes:
-      if not shape.shapes_collide(ssh):return
+      if not shape.mask:return
+      if not shape.shapes_collide(screenshape):return
+      #hsurf=pg.Surface(surf.get_size())
+      #hsurf.set_colorkey([0,0,0])
+      #hsurf.set_alpha(100)
       if isinstance(shape,munk.shapes.Poly):
-        pg.draw.polygon(surf,[100,200,100],[toscreen((Vector(v).rotate(self.body.angle,True)+self.body.position+[0,1]).pos,args["dpos"],surf.get_size()) for v in shape.get_vertices()])
+        pg.draw.polygon(surf,
+        [100,200,100],[toscreen((Vector(v).rotate(self.body.angle,True)+self.body.position+[0,1]).pos,args["dpos"],surf.get_size()) for v in shape.get_vertices()])
       elif isinstance(shape,munk.shapes.Circle):
-        pg.draw.circle( surf,[100,200,100],toscreen(self.body.position,args["dpos"],surf.get_size()),shape.radius*2)
+        pg.draw.circle(surf,
+        [100,200,100],toscreen(self.body.position,args["dpos"],surf.get_size()),shape.radius*2)
       else:print("shape incorrect",shape)
+      #surf.blit(hsurf)
 
 
 
@@ -246,7 +264,7 @@ def spawn_ball(args):
   s=pg.mouse.get_pos()
   w=pg.display.get_window_size()
   w=[w[e]/2 for e in [0,1]] #no Vectors
-  pos=[(s[0]/2+args["dpos"][0]-w[0]/2),-(s[1]/2-args["dpos"][1]-w[1]/2)+32] #no Vectors
+  pos=[(s[0]/2+args["dpos"][0]-w[0]/2),-(s[1]/2-args["dpos"][1]-w[1]/2)] #no Vectors
   body=munk.Body()
   body.position=pos
   body.velocity=[0,10]
@@ -274,32 +292,33 @@ def mousegrib(args):
   if mouse_joint is not None:
     space.remove(mouse_joint)
     mouse_joint=None
-
+  ent:eMod.Entity=args.get("hover")
+  if not ent:
+    print("noent")
+    return
+  if not ent.hascomp("Physics"):
+    print("nophys")
+    return
+  comp:Physics=ent.comp("Physics")
+  body=comp.body
+  if not body.body_type==body.DYNAMIC:
+    print("static")
+    return
+  print("success")
   p=mouse_body.position
-  print(p)
-  hit=space.point_query_nearest(p,0,munk.ShapeFilter())
-  print(hit)
-  if hit:
-    print(hit.shape.body.uid)
-    print(hit.shape.body.body_type)
-  if hit is not None and hit.shape.body.body_type==munk.Body.DYNAMIC:
-    print("grib")
-    shape=hit.shape
-    # Use the closest point on the surface if the click is outside
-    # of the shape.
-    if hit.distance>0:
-      nearest=hit.point
-    else:
-      nearest=p
-    mouse_joint=munk.PivotJoint(
-      mouse_body,
-      shape.body,
-      (0,0),
-      shape.body.world_to_local(nearest),
-    )
-    mouse_joint.max_force=1000
-    mouse_joint.error_bias=(1-0.15)**60
-    space.add(mouse_joint)
+  print(f"mouse: {p}")
+  b=body.position
+  dist=math.hypot(p[0]-b[0],p[1]-b[1])
+  mouse_joint=munk.SlideJoint(
+    mouse_body,
+    body,
+    (0,0),
+    (0,0),
+    0,dist
+  )
+  mouse_joint.max_force=100
+  mouse_joint.error_bias=(1-0.15)**60
+  space.add(mouse_joint)
 
 cd=False
 def tcd(args):
@@ -316,6 +335,8 @@ def pre_solve(arbiter:munk.Arbiter,space,data):
     shape1,shape2=arbiter.shapes
     a=bool(shape1.layer&shape2.mask)
     b=bool(shape2.layer&shape1.mask)
+    if "a"=="a":
+      return (a or b) and shape1.collidable and shape2.collidable
     #print("m1 ",shape1.mask)
     #print("m2 ",shape2.mask)
     #print("l1 ",shape1.layer)
@@ -342,30 +363,27 @@ space.add_default_collision_handler().begin=pre_solve
 debugsurf=pg.Surface([1000,1000],pg.SRCALPHA)
 draw_options=munkgame.DrawOptions(debugsurf)
 
-scol=munk.Body(body_type=munk.Body.KINEMATIC)
-space.add(scol)
-ssh=None
+screenbody=munk.Body(body_type=munk.Body.KINEMATIC)
+space.add(screenbody)
+screenshape=None
 
-from Utils.watch import watch
 def render(args):
-  w=watch()
-  global draw_options,ssh
+  global draw_options,screenshape
   wh=args["surf"].get_size()
-  if not ssh:
+  if not screenshape:
     bounds=[-wh[0]/4,-wh[1]/4,wh[0]/4,wh[1]/4]
-    ssh=munk.Poly(scol,[[bounds[i//2*2]*32,bounds[(i+1)%4//2*2+1]*32] for i in range(4)])
-    ssh.sensor=True
-    space.add(ssh)
-  w("ssh")
+    screenshape=munk.Poly(screenbody,[[bounds[i//2*2]*32,bounds[(i+1)%4//2*2+1]*32] for i in range(4)])
+    screenshape.sensor=True
+    space.add(screenshape)
   s=pg.mouse.get_pos()
   pos=args["dpos"]
   #mouse_body.update_velocity(mouse_body,(0,0),0,dt)
   #mouse_body.update_position(mouse_body,dt)
-  mouse_body.position=[(s[0]/2+pos[0]-wh[0]/4),-(s[1]/2-pos[1]-wh[1]/4)+32]
+  mouse_body.position=[(s[0]/2+pos[0]-wh[0]/4),-(s[1]/2-pos[1]-wh[1]/4)]
   #space.
 
 
-  scol.position=pos
+  screenbody.position=pos
 
 
   #debugsurf.fill([0,0,0,0])
@@ -381,5 +399,5 @@ def render(args):
     pg.draw.circle(args["surf"],[255,0,0],dpos,64*0.2)
     #print(dpos)
 
-#events.subscribe("overlay",render)
+events.subscribe("overlay",render)
 events.subscribe("spawn_ball",spawn_ball)

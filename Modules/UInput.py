@@ -20,7 +20,7 @@ class Spawn:
     self.spawning=proto
   def click(self,button,pos):
     if button==0:
-      eMod.spawn(self.spawning,[{"type":"Transform","pos":pos}])
+      eMod.spawn(self.spawning,[{"type":"Transform","pos":pos,"parent":shared.get("layerMap").uid}])
       print(f"{self.spawning} spawned at {pos}")
     if button==2:
       self.spawning=None
@@ -37,15 +37,15 @@ mouse_mask=pg.mask.Mask((3,3),fill=True)
 
 pos=Vector()
 gpos=Vector()
-hovered=None
-holding=None
-ishovered=0
-lasthovered=0
+hovered:eMod.Entity=None
+holding:eMod.Entity=None
+ishovered:bool=0
+lasthovered:eMod.Entity=0
 buttons=[False]*3
-uiactive=0
+uiactive:bool=0
 scanRect:"ScanRect"=None
 windows:dict[str:iFace.ContextMenu]={}
-active=0
+active:bool=0
 
 
   #popup
@@ -73,14 +73,14 @@ def update(args):
     if len(objs):
       menu=iFace.ContextMenu({"pos":pos,"type":"context"})
       for obj in objs:
-        objSprite=eMod.getEcomp(obj,"Sprite")
+        objSprite=obj.comp("Sprite")
         if objSprite and hasattr(objSprite,"final"):
           icon=objSprite.final
         else:
           icon=pg.Surface([1,1],pg.SRCALPHA)
         menu.addelement({
-          "name":f"{getName(obj)} ({obj}, {eMod.getEcomp(obj,"MetaData").proto})",
-          "uid":obj,
+          "name":str(obj),
+          "uid":obj.uid,
           "hover":Verbs.getVerbs,
           "img":icon,
           })
@@ -99,10 +99,10 @@ def update(args):
           w=pg.display.get_window_size()
           spawn.click(i,[s[0]+(pos[0]-w[0]/2)/64,s[1]-(pos[1]-w[1]/2)/64])
         elif i==0:
-          if holding:
-            events.call("use",{"target":hovered,"pos":gpos},entity=holding)
-          else:
-            events.call("use",entity=hovered)
+          #if holding:
+          #  events.call("use",{"target":hovered,"pos":gpos},entity=holding.uid)
+          if hovered:
+            events.call("use",entity=hovered.uid)
         elif i==2:
           scanRect=ScanRect(gpos)
   buttons=pressed
@@ -163,25 +163,27 @@ def PopupEntity(message,entity):
   pos=entity.comp("Transform").pos
   PopupPos(message,pos)
 
+@events.listen("closecontext")
+def closecontext(args):
+  global windows
+  windows|={"contextmenu":None}
 
-
-
-def checkMouse(image,imagepos:Vector,uid):
+def checkMouse(image,imagepos:Vector,entity:eMod.Entity):
   """
   check if @image in @imagepos is under mouse, and if it is set hovered id to @uid
   """
   global ishovered,hovered,scanRect
   size=image.get_size()
-  rect=pg.Rect(imagepos.pos,size)
+  rect=pg.Rect(imagepos,size)
   if spawn.spawning:return
   if uiactive:return
   scanRectSus=scanRect and rect.colliderect(scanRect.rect)
   if not(rect.collidepoint(gpos.pos) or scanRectSus): return
   mask=pg.mask.from_surface(image,1)
   if scanRectSus and mask.overlap(scanRect.mask,(scanRect.pos-imagepos).pos):
-      scanRect.result.append(uid)
+      scanRect.result.append(entity)
   if mask.overlap(mouse_mask,(gpos-imagepos).pos):
-    hovered=uid
+    hovered=entity
     ishovered=1
 
 

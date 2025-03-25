@@ -1,6 +1,6 @@
 import Modules.component as component
-from Components.TransformComponent import Transform
-from Components.MetaDataComponent import MetaData
+from Components.Transform import Transform
+from Components.MetaData import MetaData
 import Utils.shared as shared
 import Utils.parents as parents
 import copy
@@ -61,6 +61,10 @@ class Entity:
     return name in self.components
   def comp(self,name)->component.BaseComponent:
     return self.components.get(name)
+  def __repr__(self):
+    return f"<e-{self.uid}>"
+  def __str__(self):
+    return f"{self.meta.name} ({self.uid}, {self.meta.proto})"
 
 def find(uid:int)->Entity:
   uids=shared.get("uids")

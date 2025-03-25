@@ -1,26 +1,38 @@
-from Modules.rsi import *
-from Modules.Tiles import Floor
-from tqdm import tqdm
-from Utils.parents import typedict
-import Utils.shared as shared
+import os
 import pickle
-from yaml_tag import quick_load
+import Utils.shared as shared
+from Utils.fileutils import ensuredir,joinpath
+from Utils.parents import typedict
 from Utils.vector2 import Vector
+from Modules.rsi import allprotos
+from Modules.Tiles import Floor
+from Utils.hasher import check
+from tqdm import tqdm
+from yaml_tag import quick_load
+
+
 
 resources=shared.get("resources")
 alpha=[chr(i) for i in list(range(65,91))+list(range(97,123))]
 beta=["A","Q","g","w"]
 
 
-def findmapuid(raw:dict,name=None):
-  space=raw["entities"]
-  for ent in space:
-    if ent["proto"]!="":continue
-    for subent in ent["entities"]:
-      for comp in subent["components"]:
-        if comp["type"]=="MapGrid" and (name==None or name==comp["id"]):
-          return (int(subent["uid"]),typedict(subent["components"]))
-  print("station not found")
+def findmap(raw:dict,name=None):
+  for ent in raw["entities"]:
+    if ent["proto"]=="":break
+  else:raise Exception("map LOading Error")
+  ents=ent["entities"]
+  for e in ents:
+    e["components"]=typedict(e["components"])
+  ents=typedict(ents,"uid")
+
+  for grid in ents.values():
+    comps=grid["components"]
+    if "MapGrid" in comps and (name is None or name==comps["MapGrid"]["id"]):
+      break
+  else:raise Exception("Station Not Found")
+  return ents[int(comps["Transform"]["parent"])],grid
+
 
 def decode(code:str)->int|None:
   """scary letters to numbers"""
@@ -33,15 +45,16 @@ def loadmap(mapid):
     mapPath:str=allprotos["gameMap"][mapid]["mapPath"]
     print("loading layerMap")
     kakePath=joinpath("kake",mapPath.replace(".yml",".pk"))
-    if os.path.exists(kakePath):
+    fullPath=joinpath(resources,mapPath)
+    if os.path.exists(kakePath) and check(fullPath):
       print("cache found!")
       with open(kakePath,"rb") as kakefile:
         map_file=pickle.load(kakefile)
     else:
       print("cache not found\nProcessing layerMap...")
-      map_file=quick_load(joinpath(resources,mapPath))
+      map_file=quick_load(fullPath)
       ensuredir(kakePath)
-      with open(kakePath,"xb") as kakefile:
+      with open(kakePath,"wb") as kakefile:
         pickle.dump(map_file,kakefile)
     print("loaded layerMap")
     return map_file
@@ -68,9 +81,12 @@ def loadfloor(comps):
 class Grid:
   def __init__(self,mapid):
     self.raw=loadmap(mapid)
-    self.uid,self.comps=findmapuid(self.raw)
+    self.map,self.grid=findmap(self.raw)
+    self.uid=self.grid["uid"]
+    self.gridcomps=self.grid["components"]
+    self.mapcomps = self.map["components"]
     self.anchoredgrid={}
-    self.chunkMap,self.chunkGrid=loadfloor(self.comps)
+    self.chunkMap,self.chunkGrid=loadfloor(self.gridcomps)
     self.tiledict=dict([(a,Floor(b)) for a,b in tqdm(self.raw["tilemap"].items(),desc="Ordering tiles")])
   def getChunk(self,pos:list[int])->list|None:
     if pos in self.chunkMap:

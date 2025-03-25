@@ -1,9 +1,7 @@
-from Components.SpriteComponent import Sprite,Layer
-from Modules.rsi import *
-import pygame as pg
+from Components.Sprite import Sprite,Layer
+from Utils.mathutils import vec
 import Utils.events as events
 import Utils.shared as shared
-import Modules.entityModule as entityModule
 from Modules.component import BaseComponent,component
 from Utils.vector2 import Vector
 grid=shared.get("globalgrid")

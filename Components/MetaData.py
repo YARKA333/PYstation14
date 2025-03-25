@@ -2,6 +2,7 @@ from Modules.Locale import Loc
 import Modules.Verbs as verbs
 import Utils.events as events
 from Modules.component import BaseComponent,component
+from Modules.rsi import allp
 
 icoknow=verbs.icon("VerbIcons/vv.svg.192dpi.png")
 
@@ -13,8 +14,17 @@ class MetaData(BaseComponent):
     self.uid=entity.uid
     self.proto=args.get("proto")
     self.data=args.get("comps")
-    self.name=Loc(f"ent-{self.proto}")
-    self.desc=Loc(f"ent-{self.proto}.desc")
+      #name
+    name=f"ent-{self.proto}"
+    self.name=Loc(name)
+    if self.name==name:self.name=allp.get("name")
+    if not self.name:self.name="НОУНЕЙМ!"
+      #descriprion
+    desc=Loc(f"ent-{self.proto}.desc")
+    self.desc=Loc(desc)
+    if self.desc==desc:self.desc=allp.get("desc")
+    if not self.desc:self.desc="no"
+      #verbs
     events.subscribe("getVerbs",self.verbs,self.uid)
   def verbs(self,args):
     return [{

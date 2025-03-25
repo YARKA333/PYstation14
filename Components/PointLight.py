@@ -5,10 +5,9 @@ import Utils.events as events
 import random
 from tqdm import tqdm
 from Modules.component import BaseComponent,component
-from Modules.rsi import rotate_vector
+from Utils.mathutils import rotate_vector
 from Utils.colors import findcolor
 from Utils.watch import watch
-
 #lightchunks={}
 lightkake={}
 
@@ -170,6 +169,7 @@ class PointLight(BaseComponent):
     "enabled":True,
     "castShadows":True,
   }
+  _enabled=True
   def __init__(self,entity,args):
     self.uid=entity.uid
     self.comp=self.base_component.copy()
@@ -186,8 +186,20 @@ class PointLight(BaseComponent):
     if not self.comp["castShadows"]:return
     n={} if shared.get("started") else {"noupd":None}
     events.call("FOV_upd_light",{"uid":self.uid,"comp":self.comp}|n)
+  @property
+  def enabled(self):return self._enabled
+  @enabled.setter
+  def enabled(self,value):
+    if self._enabled!=value:
+      self._enabled=value
+      if value:
+        if not self.comp["castShadows"]: return
+        n={} if shared.get("started") else {"noupd":None}
+        events.call("FOV_upd_light",{"uid":self.uid,"comp":self.comp}|n)
+      else:
+        events.call("FOV_del_light",{"uid":self.uid})
 
-class FOV: #todo тоже почините
+class FOV:
   def __init__(self):
     #events.subscribe("UpdateOccluder",self.UpdateObjs)
     #events.subscribe("start",self.UpdateObjs)
@@ -230,6 +242,7 @@ class FOV: #todo тоже почините
     self.lightsarray.pop(args["uid"])
 
   def UpdateLights(self,args):
+    w=watch()
     if "rects" in args:
       rects=args["rects"]
     elif "rect" in args:
@@ -237,22 +250,15 @@ class FOV: #todo тоже почините
     else:rects=[]
     lamps=self.lightsarray.values()
     a=0
-    #t=time.time()
-    #ts=[t]
-    #print(f"started light calc: {t:.3f}")
-    for l in tqdm(lamps,desc=f"Calculating light for {len(lamps)} lamps total"):
-      self.updateLight(l,rects)
-      #a+=b
-      #if b:
-        #ts.append(time.time())
-        #print(f"lamp {a} calculated {time.time():.3f}")
-    #print(f"calculated light for {a} lamps: {time.time():.3f}")
-    #tss=[ts[i+1]-ts[i] for i in range(len(ts)-1)]
-    #if tss:
-    #  print(f"min:{min(tss):.3f},mean:{sum(tss)/len(tss):.3f},max:{max(tss):.3f}")
+    for l in tqdm(lamps,desc=f"Calculating light"):
+      b=self.updateLight(l,rects,w)
+      a+=b
+    print(f"calculated light for {a} lamps")
+    w.flush()
 
-  def updateLight(self,l,rects:list[pg.Rect]=[]):
+  def updateLight(self,l,rects:list[pg.Rect]=None,w=None):
     global lightkake
+    if rects is None:rects=[]
     if rects and "rect" in l.keys():
       for rect in rects:
         if rect.colliderect(l["rect"]):break
@@ -295,20 +301,21 @@ class FOV: #todo тоже почините
         rpos=randcirc()
         rpos=[rpos[e]*smooth for e in [0,1]]
         if shadow:
-          self.draw(s2,[l["pos"][0]*size+rpos[0],l["pos"][1]*size+rpos[1]])
+          self.draw(s2,[l["pos"][0]*size+rpos[0],l["pos"][1]*size+rpos[1]],w=w)
         a.append((s2,[rpos[e]+smooth for e in [0,1]]))
       s3.fblits(a,pg.BLEND_ADD)
     else:
       s3=s1.copy()
       if shadow:
-        self.draw(s3,[l["pos"][0]*size,l["pos"][1]*size])
+        self.draw(s3,[l["pos"][0]*size,l["pos"][1]*size],w=w)
     l.update({"img":pg.transform.invert(s3)})
     return True
 
-  def draw(self,surf,pos,color=(0,0,0),simple=True): #todo optimise "in"
+  def draw(self,surf,pos,color=(0,0,0),simple=True,w=None): #todo optimise "in"
     objs=self.objects.values()
     #print(f"draw started {time.time():.3f}")
-    w=watch()
+    if not w:w=watch()
+    w("external")
     WIDTH,HEIGHT=surf.get_size()
     hwidth,hheight=WIDTH/2,HEIGHT/2
     sx,sy=pos
@@ -370,8 +377,7 @@ class FOV: #todo тоже почините
               beh=[v-1,n] in objs
               lef=not [v,n-1] in objs and sy<x1
               rig=not [v,n+1] in objs and sy>x2
-          case _:
-            raise Exception()
+          case _:raise
         w("matchcase")
 
         if simple:
@@ -384,7 +390,7 @@ class FOV: #todo тоже почините
         #pg.draw.line(surf,[[255,0,0],[255,255,0],[0,255,0],[0,100,255]][set],pos1,pos2,5)
         pos3=iss([hwidth,hheight],pos1,[0,0,WIDTH,HEIGHT])
         pos4=iss([hwidth,hheight],pos2,[0,0,WIDTH,HEIGHT])
-
+        w("iss")
         if pos3==None or pos4==None:
           print("skip")
           continue
@@ -405,20 +411,20 @@ class FOV: #todo тоже почините
             add=[c1]
           else:
             add=[c2]
-
+        w("compiler")
         pg.draw.polygon(surf,color,[pos3,pos1,pos2,pos4]+add)
-        w("post non")
+        w("draw")
 
     #print(f"draw finished {time.time():.3f}")
-    w.flush()
+    #w.flush()
 
   def render(self,screen,pos,mode,mask=None): #todo understand...
-    if not mode: return
-
+    if not mode: return #dont render in nobody asked
+    w=watch()
     sx,sy=pos
     WIDTH,HEIGHT=screen.size
     nx,ny=sx-WIDTH/2,sy-HEIGHT/2
-    if mode==3:
+    if mode==3: ## in this mode you only see lighting, not game objects
       screen.fill([255,0,255])
     wallsurf=pg.Surface([WIDTH,HEIGHT],pg.SRCALPHA)
     wallsurf.fill([0,0,0,0])
@@ -426,6 +432,7 @@ class FOV: #todo тоже почините
     wallsurf3.fill([255,255,255])
     #wallsurf2.set_colorkey([0,0,0])
     for obj in self.objects.values():
+      ## cut walls from wallsurf
       pos=[obj[0]*size-nx,obj[1]*size-ny,size,size]
       if pos[0]+size<0 or pos[1]+size<0:continue
       if pos[0]>WIDTH or pos[1]>HEIGHT:continue
@@ -435,37 +442,46 @@ class FOV: #todo тоже почините
     s3.fill([255,255,255])
     lightimgs=[]
     for l in self.lightsarray.values():
+      ## blit prerendered lights
       img:pg.Surface=l["img"]
       radius=img.width/2
       pos=[-nx-radius+l["pos"][0]*size,-ny-radius+l["pos"][1]*size]
       if pos[0]+2*radius<0 or pos[1]+2*radius<0:continue
       if pos[0]>WIDTH or pos[1]>HEIGHT:continue
       lightimgs.append((img,pos))
-
+    w("preparation")
     s3.fblits(lightimgs,pg.BLEND_MULT)
     s3=pg.transform.invert(s3)
-    s3=pg.transform.gaussian_blur(s3,5)
-
+    #s3=pg.transform.gaussian_blur(s3,5)
+    w("blitinv")
     #wallsurf.convert_alpha()
+
     if mode==2:
       self.draw(s3,[sx,sy])
+      w("preshadowing")
     if mode!=4:
-      s35=s3.copy().convert_alpha()
+      s35=s3.convert_alpha()
       s3.blit(wallsurf,[0,0])
         #blank.blit(s3,[0,0],special_flags=pg.BLEND_RGB_MULT)#
       s35.blit(wallsurf,[0,0],special_flags=pg.BLEND_RGBA_SUB)
         #draw(s35,[sx,sy],lines,objs,simple=True)
+      w("walling")
       s4=pg.transform.box_blur(s35,64)
+      w("box")
       s4.blit(s4,[0,0],special_flags=pg.BLEND_ADD)
         #s4=s3
         #wallsurf2.blit(s4,[0,0],special_flags=pg.BLEND_RGB_MULT)
       s4.blit(wallsurf3,[0,0],special_flags=pg.BLEND_RGB_MAX)
       s3.blit(s4,[0,0],special_flags=pg.BLEND_MULT)
+      w("walling")
     if mask:
       s3.blit(mask.to_surface(),[0,0],special_flags=pg.BLEND_MAX)
+      w("masking")
     if mode==2:
       self.draw(s3,[sx,sy],simple=False)
+      w("shadowing")
     screen.blit(s3,[0,0],special_flags=pg.BLEND_MULT)
+    w("blit")
 
     for l in self.lightsarray.values():
       pg.draw.circle(screen,[255,0,0],[-nx+l["pos"][0]*size,-ny+l["pos"][1]*size],5)
@@ -484,7 +500,8 @@ class FOV: #todo тоже почините
     #  print((rect._x+.5*rect.w)/size,(rect._y+.5*rect.h)/size)
     #  pg.draw.rect(screen,[0,128,255],[-nx+rect._x,-ny-rect._y-rect.h+size,rect.w,rect.h],5)
     #  pg.draw.circle(screen,[0,128,255],[-nx+(rect._x+.5*rect.w),-ny-rect._y-.5*rect.h+size],5)
-
+    w("no")
+    w.flush()
     return screen
 
 shared.set("thechosenlamp",1696)

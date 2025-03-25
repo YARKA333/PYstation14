@@ -1,4 +1,4 @@
-import Components.SpriteComponent
+from Components.Sprite import Sprite
 from Modules.component import BaseComponent,component
 import Modules.Verbs as verbs
 from Modules.soundModule import *
@@ -43,19 +43,20 @@ class Door(BaseComponent):
     "closeSound":{"path":"/Audio/Effects/explosion1.ogg"},
     "denySound":{"path":"/Audio/Effects/explosion1.ogg"},
     "sparksSound":{"collection":"sparks"},
+    #"emergencyOnSound":{"path":"/Audio/Machines/airlock_emergencyon.ogg"},
+    #"emergencyOffSound":{"path":"/Audio/Machines/airlock_emergencyoff.ogg"},
   }
 
 
   def __init__(self,entity,args):
+    self.entity=entity
     self.comp=self.base_component.copy()
     self.comp.update(args)
     self.uid=entity.uid
     self.partial=False
-    self.sprite:Components.SpriteComponent.Sprite=None
+    self.sprite:Sprite=None
     events.followcomp("Sprite",self.Sprite,entity)
     events.subscribe("use",self.activate,self.uid)
-    events.subscribe("RMB",self.emag,self.uid)
-    events.subscribe("MMB",self.deny,self.uid)
     events.subscribe("getVerbs",self.getVerbs,self.uid)
     self.nextTime=None
     self.appear()
@@ -85,8 +86,7 @@ class Door(BaseComponent):
       args={"cancelled":False}
       events.call("BeforeDoorOpened",args,self.uid)
       if args["cancelled"]:return
-
-      PopupEntity("Боевой режим включён!",self.uid)
+      PopupEntity("Боевой режим включён!",self.entity)
       self.setstate("Opening")
       self.nextTime=time.time()+self.comp["openingTimeOne"]
       playSound(self.comp["openSound"],0.5)
@@ -95,7 +95,7 @@ class Door(BaseComponent):
       events.call("BeforeDoorClosed",args,self.uid)
       if args["cancelled"]:return
 
-      PopupEntity("Боевой режим отключён!",self.uid)
+      PopupEntity("Боевой режим отключён!",self.entity)
       self.setstate("Closing")
       self.nextTime=time.time()+self.comp["closingTimeOne"]
       playSound(self.comp["closeSound"],0.5)

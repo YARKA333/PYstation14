@@ -21,18 +21,7 @@ def component(cls):
   comps[cls.__name__]=cls
   return cls
 
-#from Components.IconSmoothComponent import IconSmooth
-#from Components.TransformComponent import Transform
-#from Components.SpriteComponent import Sprite
-#from Components.CableVisualizerComponent import CableVisualizer
-#from Components.InteractionOutlineComponent import InteractionOutline
-#from Components.SubFloorHideComponent import SubFloorHide
-#from Components.DoorComponent import Door,DoorBolt
-#from Components.MetaDataComponent import MetaData
-#from Components.PointLightComponent import Occluder,PointLight
-#from Components.PhysicsComponent import Fixtures,Physics
-#from Components.AppearanceComponent import Appearance,GenericVisualizer
-#from Components.ComputerComponent import Computer
+
 import os
 import importlib.util
 

@@ -3,7 +3,7 @@ import Utils.events as events
 from Modules.component import BaseComponent,component
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-  from Components.SpriteComponent import Sprite
+  from Components.Sprite import Sprite
 
 @component
 class SubFloorHide(BaseComponent):

@@ -1,21 +1,11 @@
-import ruamel.yaml
-
 from Modules.rsi import *
-import pickle
 
 chains=[]
 chainmap=[]
 
-#with open("kake/entity.pk","rb") as file:
-#  allp=pickle.load(file)
-
-def typedict(todict:list)->dict:
-  result={}
-  try:
-    for a in todict:
-      result.update({a["type"]:a})
-  except:print(a)
-  return result
+def typedict(todict:list[dict],key:str="type")->dict:
+  """takes a list of dicts and converts it do dict with keys corresponding dict's <key> value"""
+  return {a[key]:a for a in todict}
 
 def merge(old:list,new:list)->list:
   part=typedict(old)

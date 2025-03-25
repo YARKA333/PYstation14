@@ -91,13 +91,16 @@ class Vector:
     if not isinstance(other,Vector):
       try:
         other=Vector(other)
-      except:raise ValueError(f"invalid vector{" modifier" if single else ""}:{orig}")
+      except:raise ValueError(f"invalid vector{" modifier" if single else ""}:{repr(orig)}")
     return other
-  def max(self,*others):
-    others=[self.vecmod(other,False) for other in others]
+
+  @classmethod
+  def max(cls,*others):
+    others=[cls.vecmod(other,False) for other in others]
     x=max([other.x for other in others])
     y=max([other.y for other in others])
     return Vector(x,y)
+
   def __iter__(self):
     return iter(self.pos)
   def __len__(self):

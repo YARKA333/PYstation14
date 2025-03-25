@@ -1,10 +1,8 @@
 import os
 import re
-import time
-
 from Modules.rsi import namelist,joinpath
 from tqdm import tqdm
-import Utils.hasher as hasher
+from Utils.hasher import check
 import Utils.shared as shared
 import pickle as pk
 from os.path import exists
@@ -29,10 +27,16 @@ def addpak(name,value):
 def addfile(file:os.PathLike):
   with open(file,"rt",encoding="UTF-8") as raw:
     lines=[]
+    a=None
+    cur_line=0
     while 1:
+      cur_line+=1
       line=raw.readline()
       if "=" in line or not line:
         if lines:
+          if not a:
+            print(f"Locale error in file {file}:{cur_line}")
+            return
           parsed=parse_text("".join(lines))
           addpak(a,parsed)
         if not line:break
@@ -245,22 +249,26 @@ def Loc(name:str,args:dict={}):
   if not pat:return name
   return fill(pat,args)
 
-res=shared.get("resources")
-if not res:res="C:/Servers/SS14 c2/Resources/"
-kake_path="kake/loc.pk"
-path=joinpath(res,"Locale")
-#old_hash=hasher.get_hash("Locale")
-#new_hash=hasher.hash_path(path)
-if exists(kake_path):# and old_hash==new_hash:
-  with open(kake_path,"rb") as file:
-    paks=pk.load(file)
-else:
-  namespace=namelist(joinpath(res,"Locale/ru-RU/"),full=True)
-  for path in tqdm(namespace,desc="Translating"):
-    addfile(path)
-  with open(kake_path,"wb") as file:
-    pk.dump(paks,file)
-  hasher.set_hash("Locale",new_hash)
+def load(ldr):
+  global paks
+  res=shared.get("resources")
+  if not res: res="C:/Servers/SS14 c2/Resources/"
+  kake_path="kake/loc.pk"
+  path=joinpath(res,"Locale")
+  #old_hash=hasher.get_hash("Locale")
+  #new_hash=hasher.hash_path(path)
+
+  if exists(kake_path) and check(path):
+    with open(kake_path,"rb") as file:
+      paks=pk.load(file)
+  else:
+    namespace=namelist(joinpath(res,"Locale/ru-RU/"),full=True)
+    for path in tqdm(ldr.iter(namespace),desc="Translating"):
+      addfile(path)
+    with open(kake_path,"wb") as file:
+      pk.dump(paks,file)
+    #hasher.set_hash("Locale",new_hash)
+
 
 if __name__=="__main__":
   print(Loc("ent-APCBasic.suffix",{"name":"иМя"}))

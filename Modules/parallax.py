@@ -1,6 +1,7 @@
 import os.path
 import random
 from Modules.rsi import *
+from Utils.fileutils import ensuredir
 import tomllib
 import noise
 from tqdm import tqdm
@@ -123,12 +124,12 @@ def generated_texture(configPath,id):
   return image
 
 class Parallax:
-  def __init__(self,id):
+  def __init__(self,id,ldg):
     self.layers=[]
     ymlayers=allprotos["parallax"][id]["layers"]
-    for ymlayer in tqdm(ymlayers,desc="generating parallax... "):
+    for ymlayer in tqdm(ldg.iter(ymlayers),desc="generating parallax... "):
       proto=default_proto.copy()
-      print(ymlayer)
+      #print(ymlayer)
       proto.update(ymlayer)
       self.layers.append(Layer(proto))
   def draw(self,surf,x,y):

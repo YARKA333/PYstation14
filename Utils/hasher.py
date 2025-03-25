@@ -63,4 +63,40 @@ def check_path_hash(key,path,update:bool=False)->bool:
       set_hash(key,new_hash)
     return False
 
+def getmtime(path):
+  if os.path.isfile(path):
+    return os.path.getmtime(path)
+  elif os.path.isdir(path):
+    return max(os.path.getmtime(os.path.join(root, file)) for root, dirs, files in os.walk(path) for file in files)
+  else:raise FileNotFoundError(path)
 
+def ismod(path:str,db_path:str="kake/mtime.json")->bool:
+  """
+  checks if file or folder were modified since last check
+  :param path: path to file or floder to check
+  :param db_path: path to DB, "kake/mtime.json" by default
+  :return: False if file is in DB and is not modified
+  """
+  try:
+    with open(db_path,'r') as f:
+      db=json.load(f)
+  except:
+    db={}
+  current_date = getmtime(path)
+  if current_date!=db.get(path):
+    db[path] = current_date
+    ensuredir(db_path)
+    print(db)
+    with open(db_path,'w') as f:
+      json.dump(db,f,indent=2)
+    return True
+  return False
+
+def check(path:str,db_path:str="kake/mtime.json")->bool:
+  """
+  checks if file or folder were modified since last check
+  :param path: path to file or floder to check
+  :param db_path: path to DB, "kake/mtime.json" by default
+  :return: True if file is in DB and is not modified
+  """
+  return not ismod(path,db_path)

@@ -1,6 +1,6 @@
 import pygame as pg
 
-import Components.MetaDataComponent
+import Components.MetaData
 import Modules.rsi as rsi
 import random
 import math
@@ -91,10 +91,6 @@ def split_text(text,max_width):
       if testing_scale<=0: return lines,testing
       testing-=dif
     testing_scale-=1
-
-
-
-
 
 class ContextMenu:
   def __init__(self,args):
@@ -188,6 +184,7 @@ class ContextMenu:
       if (pressed
       and not self.pressed
       and "click" in element):
+        events.call("closecontext")
         element["click"](uid)
     if self.hovered!=hovered:
       if self.child:
@@ -251,7 +248,7 @@ class ExaMenu:
     self.uid=args.get("uid")
     self.calculate()
   def calculate(self):
-    meta:Components.MetaDataComponent.MetaData=eMod.getEcomp(self.uid,"MetaData")
+    meta:Components.MetaData.MetaData=eMod.getEcomp(self.uid,"MetaData")
     lines=wrap_text(meta.desc,274)
     title_lines=wrap_text(f"{meta.name} ({meta.proto})",278)
     #surf

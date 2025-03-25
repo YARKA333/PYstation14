@@ -13,11 +13,11 @@ yaml.CLoader.yaml_implicit_resolvers.pop("o")
 #yaml.add_constructor(None,TagPlaceholder)
 yaml.CLoader.add_constructor(None,TagPlaceholder)
 #@numba.njit(cache=1)
-def load_protos(reload=False,source=None,pickle=False,json=False):
+def load_protos(source=None,pickle=False,json=False,ask=False,ldr=None):
   global names,allProtos
   namess=namelist("Prototypes/",source)
   names=[name for name in namess if name.endswith(".yml")]
-  for name in tqdm(names,desc="Reading protos"):
+  for name in tqdm((ldr.iter(names) if ldr else names),desc="Reading protos"):
     with open(joinpath(source,"Prototypes/",name),"rt",encoding="UTF-8") as file:
       text=file.read()
     if not text: continue
@@ -45,9 +45,10 @@ def load_protos(reload=False,source=None,pickle=False,json=False):
     else:
       type[id]=proto
   #allp=detag(allp)
-  input("press enter to continue")
-  print(allp["entity"])
-  input("press enter to dump")
+  if ask:
+    input("press enter to continue")
+    print(allp["entity"])
+    input("press enter to dump")
   if json:
     try:
       with open("protrotypes.json","wt") as file:
@@ -60,7 +61,8 @@ def load_protos(reload=False,source=None,pickle=False,json=False):
         picklelib.dump(allp,file)
       print("pickle dump successfull")
     except Exception as error:print(error)
+  return allp
 
 
 if __name__=="__main__":
-  load_protos(True,json=False,pickle=True,source="C:/Servers/SS14 c2/Resources")
+  load_protos(json=False,pickle=True,ask=True,source="C:/Servers/SS14 c2/Resources")

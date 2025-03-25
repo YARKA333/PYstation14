@@ -2,6 +2,7 @@ from Modules.rsi import *
 import math
 from Modules.component import BaseComponent,component
 from Utils.vector2 import Vector
+import Utils.events as events
 
 @component
 class Transform(BaseComponent):
@@ -12,10 +13,11 @@ class Transform(BaseComponent):
     result={}
     pos=component.get("pos",None)
     rot=component.get("rot",None)
+    self.noRot=component.get("noRot",False)
     anc=component.get("anchored",False)
     events.subscribe("teleport",self.replace,self.uid)
-    self.parent=int(component.get("parent",0))
-    self.maingrid=shared.get("layerMap").uid==self.parent
+    self.parent=int(component.get("parent","Default"))
+    self.maingrid=shared.get("layerMap").uid==self.parent or self.parent=="Default"
     if not self.maingrid:pos=[666,666]
     #anc=dict.get(component,"anchored",None)
     if pos is None:
